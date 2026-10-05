@@ -761,3 +761,64 @@ body {
   background: rgba(251, 191, 36, 0.15);
 }
 
+/* 🌊 Realistic Animated Rivers Styling */
+.river-bed-glow {
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.5));
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.river-stream-animated {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 12, 10;
+  animation: riverFlow 1.8s linear infinite;
+  cursor: pointer;
+  transition: stroke-width 0.2s, stroke 0.2s;
+}
+
+.river-stream-animated:hover {
+  stroke-width: 6px !important;
+  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.9));
+}
+
+@keyframes riverFlow {
+  from {
+    stroke-dashoffset: 44;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.river-station-icon {
+  background: #0284c7;
+  color: white;
+  border: 2px solid #e0f2fe;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.river-station-icon:hover {
+  transform: scale(1.2);
+}
+
+.river-badge-tag {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: none;
+  white-space: nowrap;
+}
+

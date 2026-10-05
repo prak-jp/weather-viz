@@ -1,11 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
+import {
+  CircleMarker,
+  MapContainer,
+  Marker,
+  Polyline,
+  Popup,
+  TileLayer,
+  Tooltip,
+  useMap,
+} from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { fetchMapOverlay, fetchNepalRivers } from "../api";
 import { RISK_COLORS, RISK_LABELS, tempColor } from "../risk";
 import { weatherIcon } from "../utils";
 import RiskSidebar from "./RiskSidebar";
+import { NEPAL_RIVER_PATHS } from "../data/nepalRivers";
 
 // Fix Leaflet default marker icon broken in Vite/React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -19,7 +29,15 @@ function Recenter({ lat, lon, focus }) {
   const map = useMap();
   useEffect(() => {
     if (focus) {
-      map.flyTo([focus.latitude, focus.longitude], 9, { duration: 0.65 });
+      const targetLat =
+        focus.latitude ??
+        focus.stationLat ??
+        (focus.coordinates ? focus.coordinates[0][0] : lat);
+      const targetLon =
+        focus.longitude ??
+        focus.stationLon ??
+        (focus.coordinates ? focus.coordinates[0][1] : lon);
+      map.flyTo([targetLat, targetLon], 9, { duration: 0.65 });
     } else {
       map.setView([lat, lon], 8);
     }
@@ -50,7 +68,9 @@ export default function LiveMap({ city, weather }) {
   const lat = city.latitude;
   const lon = city.longitude;
   const current = weather?.current;
-  const inNepal = city.country === "Nepal" || (lat >= 26.3 && lat <= 30.55 && lon >= 80 && lon <= 88.35);
+  const inNepal =
+    city.country === "Nepal" ||
+    (lat >= 26.3 && lat <= 30.55 && lon >= 80 && lon <= 88.35);
 
   const [overlay, setOverlay] = useState(null);
   const [nepal, setNepal] = useState(null);
@@ -121,14 +141,40 @@ export default function LiveMap({ city, weather }) {
     };
   }, []);
 
-  const sidebarItems = inNepal && layers.nepalRivers
-    ? nepal?.rivers ?? []
-    : (overlay?.rivers ?? []).map((r, i) => ({
-        ...r,
-        id: `local-${i}`,
-        name: "Nearby river cell",
-        region: "GloFAS",
-      }));
+  // Combine river geometric paths with live GloFAS flow risk data
+  const riversWithPaths = useMemo(() => {
+    const riskMap = new Map();
+    if (nepal?.rivers) {
+      for (const r of nepal.rivers) {
+        riskMap.set(r.id, r);
+      }
+    }
+    return NEPAL_RIVER_PATHS.map((river) => {
+      const riskData = riskMap.get(river.id);
+      const midIdx = Math.floor(river.coordinates.length / 2);
+      return {
+        ...river,
+        ...riskData,
+        coordinates: river.coordinates,
+        stationLat: riskData?.latitude ?? river.coordinates[midIdx][0],
+        stationLon: riskData?.longitude ?? river.coordinates[midIdx][1],
+        risk: riskData?.risk ?? "low",
+        discharge: riskData?.discharge,
+        peak_7d: riskData?.peak_7d,
+        ratio: riskData?.ratio,
+      };
+    });
+  }, [nepal]);
+
+  const sidebarItems =
+    inNepal && layers.nepalRivers
+      ? riversWithPaths
+      : (overlay?.rivers ?? []).map((r, i) => ({
+          ...r,
+          id: `local-${i}`,
+          name: "Nearby river cell",
+          region: "GloFAS",
+        }));
 
   const selectedId = focus?.id ?? (focus ? `${focus.latitude}-${focus.longitude}` : null);
   const cityLabel = `${city.name}${current?.weather_description ? ` · ${current.weather_description}` : ""}`;
@@ -137,13 +183,38 @@ export default function LiveMap({ city, weather }) {
     <section className="map-section">
       <div className="map-card">
         <div className="map-header">
-          <p className="map-title">🗺 Live Weather Map</p>
+          <p className="map-title">🗺 Live Weather & Nepal Rivers Map</p>
           <div className="layer-pills">
-            <button className={`layer-pill${layers.temp ? ' active' : ''}`} onClick={() => setLayers(s => ({...s, temp: !s.temp}))}>🌡 Temp</button>
-            <button className={`layer-pill${layers.radar ? ' active' : ''}`} onClick={() => setLayers(s => ({...s, radar: !s.radar}))}>🌧 Radar</button>
-            <button className={`layer-pill${layers.localRisk ? ' active' : ''}`} onClick={() => setLayers(s => ({...s, localRisk: !s.localRisk}))}>🔴 River Risk</button>
-            <button className={`layer-pill${layers.nepalRivers ? ' active' : ''}`} onClick={() => setLayers(s => ({...s, nepalRivers: !s.nepalRivers}))}>🏔 Nepal Rivers</button>
-            <button className={`layer-pill${layers.tempGrid ? ' active' : ''}`} onClick={() => setLayers(s => ({...s, tempGrid: !s.tempGrid}))}>🟦 Temp Grid</button>
+            <button
+              className={`layer-pill${layers.temp ? " active" : ""}`}
+              onClick={() => setLayers((s) => ({ ...s, temp: !s.temp }))}
+            >
+              🌡 Temp
+            </button>
+            <button
+              className={`layer-pill${layers.radar ? " active" : ""}`}
+              onClick={() => setLayers((s) => ({ ...s, radar: !s.radar }))}
+            >
+              🌧 Radar
+            </button>
+            <button
+              className={`layer-pill${layers.nepalRivers ? " active" : ""}`}
+              onClick={() => setLayers((s) => ({ ...s, nepalRivers: !s.nepalRivers }))}
+            >
+              🌊 Nepal Rivers
+            </button>
+            <button
+              className={`layer-pill${layers.localRisk ? " active" : ""}`}
+              onClick={() => setLayers((s) => ({ ...s, localRisk: !s.localRisk }))}
+            >
+              🔴 Local Flood Risk
+            </button>
+            <button
+              className={`layer-pill${layers.tempGrid ? " active" : ""}`}
+              onClick={() => setLayers((s) => ({ ...s, tempGrid: !s.tempGrid }))}
+            >
+              🟦 Temp Grid
+            </button>
           </div>
         </div>
 
@@ -167,6 +238,7 @@ export default function LiveMap({ city, weather }) {
                 maxNativeZoom={20}
                 maxZoom={20}
               />
+
               {layers.radar && radarUrl && (
                 <TileLayer
                   url={radarUrl}
@@ -178,6 +250,89 @@ export default function LiveMap({ city, weather }) {
                   maxZoom={20}
                 />
               )}
+
+              {/* Realistic Animated Nepal River Paths */}
+              {layers.nepalRivers &&
+                riversWithPaths.map((river) => {
+                  const isSelected = selectedId === river.id;
+                  const isDangerous = river.risk === "flood" || river.risk === "danger";
+                  const streamColor = isDangerous
+                    ? RISK_COLORS[river.risk]
+                    : isSelected
+                    ? "#38bdf8"
+                    : "#0284c7";
+
+                  return (
+                    <div key={`river-group-${river.id}`}>
+                      {/* 1. Glowing riverbed base */}
+                      <Polyline
+                        positions={river.coordinates}
+                        pathOptions={{
+                          color: isDangerous ? RISK_COLORS[river.risk] : "#0369a1",
+                          weight: isSelected ? 9 : 6,
+                          opacity: isSelected ? 0.75 : 0.45,
+                          className: "river-bed-glow",
+                        }}
+                      />
+
+                      {/* 2. Animated flowing water channel */}
+                      <Polyline
+                        positions={river.coordinates}
+                        pathOptions={{
+                          color: streamColor,
+                          weight: isSelected ? 4.5 : 3,
+                          opacity: 0.95,
+                          className: "river-stream-animated",
+                        }}
+                        eventHandlers={{
+                          click: () => setFocus(river),
+                        }}
+                      >
+                        <Tooltip sticky>
+                          🌊 <strong>{river.name}</strong> ({river.basin} Basin)
+                        </Tooltip>
+                        <Popup>
+                          <div>
+                            <h4>🌊 {river.name}</h4>
+                            <p><strong>Basin:</strong> {river.basin} · {river.region}</p>
+                            <p>
+                              <strong>Status:</strong>{" "}
+                              <span style={{ color: RISK_COLORS[river.risk] || "#38bdf8" }}>
+                                {RISK_LABELS[river.risk] ?? "Normal Flow"}
+                              </span>
+                            </p>
+                            {river.discharge != null && (
+                              <p><strong>Discharge:</strong> {river.discharge} m³/s</p>
+                            )}
+                            {river.peak_7d != null && (
+                              <p><strong>7-day Peak:</strong> {river.peak_7d} m³/s</p>
+                            )}
+                          </div>
+                        </Popup>
+                      </Polyline>
+
+                      {/* 3. River Monitoring Gauge Pin */}
+                      <CircleMarker
+                        center={[river.stationLat, river.stationLon]}
+                        radius={isSelected ? 7 : 4.5}
+                        pathOptions={{
+                          color: "#ffffff",
+                          fillColor: RISK_COLORS[river.risk] ?? "#0284c7",
+                          fillOpacity: 1,
+                          weight: 1.5,
+                        }}
+                        eventHandlers={{
+                          click: () => setFocus(river),
+                        }}
+                      >
+                        <Tooltip direction="top" offset={[0, -4]}>
+                          📍 {river.name} Station
+                        </Tooltip>
+                      </CircleMarker>
+                    </div>
+                  );
+                })}
+
               {layers.tempGrid &&
                 overlay?.grid?.map((cell, i) =>
                   cell.temp == null ? null : (
@@ -199,6 +354,7 @@ export default function LiveMap({ city, weather }) {
                     </CircleMarker>
                   ),
                 )}
+
               {layers.localRisk &&
                 overlay?.rivers?.map((river, i) => (
                   <CircleMarker
@@ -221,37 +377,7 @@ export default function LiveMap({ city, weather }) {
                     </Popup>
                   </CircleMarker>
                 ))}
-              {layers.nepalRivers &&
-                nepal?.rivers?.map((river) => (
-                  <CircleMarker
-                    key={river.id}
-                    center={[river.latitude, river.longitude]}
-                    radius={9}
-                    pathOptions={{
-                      color: "#93c5fd",
-                      fillColor: RISK_COLORS[river.risk] ?? RISK_COLORS.unknown,
-                      fillOpacity: 0.9,
-                      weight: 2,
-                    }}
-                    eventHandlers={{
-                      click: () => setFocus(river),
-                    }}
-                  >
-                    <Popup>
-                      <strong>{river.name}</strong>
-                      <br />
-                      {river.basin} · {river.region}
-                      <br />
-                      {RISK_LABELS[river.risk] ?? "Unknown"}
-                      {river.peak_7d != null && (
-                        <>
-                          <br />
-                          Peak 7d {river.peak_7d} m³/s
-                        </>
-                      )}
-                    </Popup>
-                  </CircleMarker>
-                ))}
+
               {layers.temp && current?.temperature_2m != null && (
                 <TempMarker
                   position={[lat, lon]}
@@ -260,16 +386,17 @@ export default function LiveMap({ city, weather }) {
                 />
               )}
             </MapContainer>
+
             <div className="map-legend">
-              <span><i style={{ background: RISK_COLORS?.flood || '#f43f5e' }} /> Flood risk</span>
-              <span><i style={{ background: RISK_COLORS?.danger || '#fbbf24' }} /> Dangerous river</span>
-              <span><i style={{ background: RISK_COLORS?.watch || '#fef08a' }} /> Watch</span>
-              <span><i style={{ background: RISK_COLORS?.low || '#38bdf8' }} /> Typical</span>
+              <span><i style={{ background: '#38bdf8' }} /> Normal Water Flow</span>
+              <span><i style={{ background: RISK_COLORS?.watch || '#fef08a' }} /> Watch / Elevated</span>
+              <span><i style={{ background: RISK_COLORS?.danger || '#fbbf24' }} /> Dangerous Discharge</span>
+              <span><i style={{ background: RISK_COLORS?.flood || '#f43f5e' }} /> Flood Warning</span>
             </div>
           </div>
 
           <RiskSidebar
-            title={inNepal && layers.nepalRivers ? "Nepal river risk" : "Nearby river risk"}
+            title={inNepal && layers.nepalRivers ? "Nepal River Flow & Risk" : "Nearby River Risk"}
             items={sidebarItems}
             selectedId={selectedId}
             onSelect={setFocus}
