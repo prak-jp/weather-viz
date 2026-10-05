@@ -3,6 +3,7 @@ import {
   CircleMarker,
   MapContainer,
   Marker,
+  Polygon,
   Polyline,
   Popup,
   TileLayer,
@@ -18,6 +19,7 @@ import { weatherIcon } from "../utils";
 import RiskSidebar from "./RiskSidebar";
 import RainEffect from "./RainEffect";
 import { NEPAL_RIVER_PATHS } from "../data/nepalRivers";
+import { NEPAL_BORDER_COORDINATES } from "../data/nepalBoundary";
 
 // Fix Leaflet default marker icon broken in Vite/React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -26,6 +28,27 @@ L.Icon.Default.mergeOptions({
   iconUrl:       "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   shadowUrl:     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
+
+const MAP_THEMES = {
+  clear: {
+    name: "🗺️ Style: Clear",
+    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    subdomains: ["a", "b", "c", "d"],
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  },
+  dark: {
+    name: "🌙 Style: Dark",
+    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    subdomains: ["a", "b", "c", "d"],
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  },
+  satellite: {
+    name: "🛰️ Style: Satellite",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    subdomains: [],
+    attribution: '&copy; <a href="https://www.esri.com/">Esri</a>',
+  },
+};
 
 function Recenter({ lat, lon, focus }) {
   const map = useMap();
@@ -89,6 +112,9 @@ export default function LiveMap({ city, weather, onSelectCity }) {
   const [radarUrl, setRadarUrl] = useState(null);
   const [focus, setFocus] = useState(null);
 
+  // Map tile style state (Clear by default for maximum visibility)
+  const [mapTheme, setMapTheme] = useState("clear");
+
   // Map Click Inspection State
   const [inspectPoint, setInspectPoint] = useState(null);
 
@@ -108,7 +134,8 @@ export default function LiveMap({ city, weather, onSelectCity }) {
   const [layers, setLayers] = useState({
     temp: true,
     radar: true,
-    rainEffect: true, // auto or user toggle
+    rainEffect: true,
+    nepalBorder: true,
     localRisk: true,
     nepalRivers: inNepal,
     tempGrid: false,
@@ -246,17 +273,37 @@ export default function LiveMap({ city, weather, onSelectCity }) {
   const selectedId = focus?.id ?? (focus ? `${focus.latitude}-${focus.longitude}` : null);
   const cityLabel = `${city.name}${current?.weather_description ? ` · ${current.weather_description}` : ""}`;
 
+  const currentTheme = MAP_THEMES[mapTheme] || MAP_THEMES.clear;
+
   return (
     <section className="map-section">
       <div className="map-card">
         <div className="map-header">
-          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-            <p className="map-title">🗺 Live Weather & Nepal Rivers Map</p>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
+            <p className="map-title">🗺 Live Map & Country Borders</p>
             {isRaining && (
               <span className="rain-live-badge">🌧️ Rain Active</span>
             )}
           </div>
           <div className="layer-pills">
+            {/* Map Clarity & Style Switcher */}
+            <button
+              className="layer-pill active"
+              style={{ borderColor: "#38bdf8", color: "#e0f2fe" }}
+              onClick={() =>
+                setMapTheme((t) => (t === "clear" ? "dark" : t === "dark" ? "satellite" : "clear"))
+              }
+              title="Click to toggle between Clear, Dark, and Satellite map styles"
+            >
+              {currentTheme.name}
+            </button>
+            <button
+              className={`layer-pill${layers.nepalBorder ? " active" : ""}`}
+              onClick={() => setLayers((s) => ({ ...s, nepalBorder: !s.nepalBorder }))}
+              title="Toggle country national boundary outline"
+            >
+              🇳🇵 Nepal Border
+            </button>
             <button
               className={`layer-pill${layers.temp ? " active" : ""}`}
               onClick={() => setLayers((s) => ({ ...s, temp: !s.temp }))}
@@ -324,13 +371,41 @@ export default function LiveMap({ city, weather, onSelectCity }) {
               <Recenter lat={lat} lon={lon} focus={focus} />
               <MapClickHandler onMapClick={handleMapClick} />
 
+              {/* Crystal-clear Base Tile Layer */}
               <TileLayer
-                attribution='&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png"
+                key={mapTheme}
+                url={currentTheme.url}
+                subdomains={currentTheme.subdomains}
+                attribution={currentTheme.attribution}
                 minNativeZoom={0}
                 maxNativeZoom={20}
                 maxZoom={20}
               />
+
+              {/* Satellite boundaries and place labels */}
+              {mapTheme === "satellite" && (
+                <TileLayer
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+                  zIndex={300}
+                />
+              )}
+
+              {/* 🇳🇵 Nepal Country Border Highlight */}
+              {layers.nepalBorder && inNepal && (
+                <Polygon
+                  positions={NEPAL_BORDER_COORDINATES}
+                  pathOptions={{
+                    color: "#38bdf8",
+                    weight: 2.8,
+                    opacity: 0.9,
+                    fillColor: "#0284c7",
+                    fillOpacity: 0.05,
+                    dashArray: "6, 6",
+                  }}
+                >
+                  <Tooltip sticky>🇳🇵 Nepal (नेपाल) Border</Tooltip>
+                </Polygon>
+              )}
 
               {layers.radar && radarUrl && (
                 <TileLayer
