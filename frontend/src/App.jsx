@@ -204,7 +204,7 @@ export default function App() {
             </div>
 
             <CurrentWeather current={weather.current} />
-            <LiveMap city={city} weather={weather} />
+            <LiveMap city={city} weather={weather} onSelectCity={handleSelectCity} />
             <HourlyChart hourly={weather.hourly} timezone={tz} />
             <DailyForecast daily={weather.daily} timezone={tz} />
           </>

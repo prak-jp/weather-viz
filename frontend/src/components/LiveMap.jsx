@@ -8,13 +8,15 @@ import {
   TileLayer,
   Tooltip,
   useMap,
+  useMapEvents,
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { fetchMapOverlay, fetchNepalRivers } from "../api";
+import { fetchMapOverlay, fetchNepalRivers, fetchWeather } from "../api";
 import { RISK_COLORS, RISK_LABELS, tempColor } from "../risk";
 import { weatherIcon } from "../utils";
 import RiskSidebar from "./RiskSidebar";
+import RainEffect from "./RainEffect";
 import { NEPAL_RIVER_PATHS } from "../data/nepalRivers";
 
 // Fix Leaflet default marker icon broken in Vite/React
@@ -45,6 +47,15 @@ function Recenter({ lat, lon, focus }) {
   return null;
 }
 
+function MapClickHandler({ onMapClick }) {
+  useMapEvents({
+    click: (e) => {
+      onMapClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
 function TempMarker({ position, temp, label }) {
   const icon = useMemo(
     () =>
@@ -64,7 +75,7 @@ function TempMarker({ position, temp, label }) {
   );
 }
 
-export default function LiveMap({ city, weather }) {
+export default function LiveMap({ city, weather, onSelectCity }) {
   const lat = city.latitude;
   const lon = city.longitude;
   const current = weather?.current;
@@ -77,9 +88,27 @@ export default function LiveMap({ city, weather }) {
   const [error, setError] = useState(null);
   const [radarUrl, setRadarUrl] = useState(null);
   const [focus, setFocus] = useState(null);
+
+  // Map Click Inspection State
+  const [inspectPoint, setInspectPoint] = useState(null);
+
+  // Check if current location or inspected point has active rain
+  const currentHasRain =
+    current?.precipitation > 0 ||
+    [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99].includes(
+      current?.weather_code
+    );
+  const inspectHasRain =
+    inspectPoint?.weather?.current?.precipitation > 0 ||
+    [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99].includes(
+      inspectPoint?.weather?.current?.weather_code
+    );
+  const isRaining = currentHasRain || inspectHasRain;
+
   const [layers, setLayers] = useState({
     temp: true,
     radar: true,
+    rainEffect: true, // auto or user toggle
     localRisk: true,
     nepalRivers: inNepal,
     tempGrid: false,
@@ -141,7 +170,45 @@ export default function LiveMap({ city, weather }) {
     };
   }, []);
 
-  // Combine river geometric paths with live GloFAS flow risk data
+  // Handle clicking anywhere on the map to inspect live weather
+  const handleMapClick = async (clickedLat, clickedLon) => {
+    const roundedLat = Math.round(clickedLat * 10000) / 10000;
+    const roundedLon = Math.round(clickedLon * 10000) / 10000;
+
+    setInspectPoint({
+      lat: roundedLat,
+      lon: roundedLon,
+      loading: true,
+      weather: null,
+    });
+
+    try {
+      const data = await fetchWeather(roundedLat, roundedLon);
+      setInspectPoint({
+        lat: roundedLat,
+        lon: roundedLon,
+        loading: false,
+        weather: data,
+      });
+    } catch {
+      setInspectPoint((prev) => (prev ? { ...prev, loading: false, error: true } : null));
+    }
+  };
+
+  const handleApplyInspectCity = (insp) => {
+    if (!onSelectCity) return;
+    const desc = insp.weather?.current?.weather_description || "Custom Location";
+    onSelectCity({
+      name: `Point (${insp.lat}, ${insp.lon})`,
+      admin1: desc,
+      country: "",
+      latitude: insp.lat,
+      longitude: insp.lon,
+    });
+    setInspectPoint(null);
+  };
+
+  // Combine river paths with live GloFAS risk data
   const riversWithPaths = useMemo(() => {
     const riskMap = new Map();
     if (nepal?.rivers) {
@@ -183,7 +250,12 @@ export default function LiveMap({ city, weather }) {
     <section className="map-section">
       <div className="map-card">
         <div className="map-header">
-          <p className="map-title">🗺 Live Weather & Nepal Rivers Map</p>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <p className="map-title">🗺 Live Weather & Nepal Rivers Map</p>
+            {isRaining && (
+              <span className="rain-live-badge">🌧️ Rain Active</span>
+            )}
+          </div>
           <div className="layer-pills">
             <button
               className={`layer-pill${layers.temp ? " active" : ""}`}
@@ -198,6 +270,13 @@ export default function LiveMap({ city, weather }) {
               🌧 Radar
             </button>
             <button
+              className={`layer-pill${layers.rainEffect ? " active" : ""}`}
+              onClick={() => setLayers((s) => ({ ...s, rainEffect: !s.rainEffect }))}
+              title="Toggle falling rain particle effect"
+            >
+              {layers.rainEffect ? "💧 Rain Effect: ON" : "💧 Rain Effect: OFF"}
+            </button>
+            <button
               className={`layer-pill${layers.nepalRivers ? " active" : ""}`}
               onClick={() => setLayers((s) => ({ ...s, nepalRivers: !s.nepalRivers }))}
             >
@@ -207,7 +286,7 @@ export default function LiveMap({ city, weather }) {
               className={`layer-pill${layers.localRisk ? " active" : ""}`}
               onClick={() => setLayers((s) => ({ ...s, localRisk: !s.localRisk }))}
             >
-              🔴 Local Flood Risk
+              🔴 Flood Risk
             </button>
             <button
               className={`layer-pill${layers.tempGrid ? " active" : ""}`}
@@ -222,6 +301,18 @@ export default function LiveMap({ city, weather }) {
 
         <div className="map-layout">
           <div className="map-frame">
+            {/* 🌧️ Realistic Falling Rain Overlay */}
+            <RainEffect
+              active={layers.rainEffect && (isRaining || layers.rainEffect)}
+              intensity={
+                (current?.precipitation ?? 0) > 3 || (inspectPoint?.weather?.current?.precipitation ?? 0) > 3
+                  ? "heavy"
+                  : isRaining
+                  ? "moderate"
+                  : "light"
+              }
+            />
+
             <MapContainer
               center={[lat, lon]}
               zoom={8}
@@ -231,6 +322,8 @@ export default function LiveMap({ city, weather }) {
               className="leaflet-host"
             >
               <Recenter lat={lat} lon={lon} focus={focus} />
+              <MapClickHandler onMapClick={handleMapClick} />
+
               <TileLayer
                 attribution='&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png"
@@ -311,7 +404,7 @@ export default function LiveMap({ city, weather }) {
                         </Popup>
                       </Polyline>
 
-                      {/* 3. River Monitoring Gauge Pin */}
+                      {/* 3. River Monitoring Station */}
                       <CircleMarker
                         center={[river.stationLat, river.stationLon]}
                         radius={isSelected ? 7 : 4.5}
@@ -332,6 +425,58 @@ export default function LiveMap({ city, weather }) {
                     </div>
                   );
                 })}
+
+              {/* 📍 Live Inspection Marker for Any Clicked Spot on Map */}
+              {inspectPoint && (
+                <Marker
+                  position={[inspectPoint.lat, inspectPoint.lon]}
+                  eventHandlers={{
+                    popupclose: () => setInspectPoint(null),
+                  }}
+                >
+                  <Popup autoPan>
+                    <div className="map-inspect-popup">
+                      {inspectPoint.loading ? (
+                        <div>
+                          <h4>📍 Inspecting Spot</h4>
+                          <p>Lat: {inspectPoint.lat}, Lon: {inspectPoint.lon}</p>
+                          <p style={{ marginTop: "0.4rem", color: "#0284c7" }}>
+                            ⏳ Loading live temperature & radar...
+                          </p>
+                        </div>
+                      ) : inspectPoint.weather ? (
+                        <div>
+                          <h4>
+                            📍 {weatherIcon(inspectPoint.weather.current.weather_code)}{" "}
+                            {inspectPoint.weather.current.weather_description}
+                          </h4>
+                          <div className="map-inspect-temp">
+                            {Math.round(inspectPoint.weather.current.temperature_2m)}°C
+                          </div>
+                          <div className="map-inspect-details">
+                            <div>💧 Humidity: {inspectPoint.weather.current.relative_humidity_2m}%</div>
+                            <div>🌧️ Rain/Precip: {inspectPoint.weather.current.precipitation} mm</div>
+                            <div>💨 Wind: {inspectPoint.weather.current.wind_speed_10m} km/h</div>
+                            <div>📍 Coordinates: {inspectPoint.lat}, {inspectPoint.lon}</div>
+                          </div>
+                          <button
+                            type="button"
+                            className="map-inspect-btn"
+                            onClick={() => handleApplyInspectCity(inspectPoint)}
+                          >
+                            🎯 Set As Main Location
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <h4>📍 Spot Weather</h4>
+                          <p>Could not fetch data for this spot.</p>
+                        </div>
+                      )}
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
 
               {layers.tempGrid &&
                 overlay?.grid?.map((cell, i) =>
