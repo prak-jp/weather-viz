@@ -73,10 +73,11 @@ async def weather(
     lat: float = Query(..., ge=-90, le=90),
     lon: float = Query(..., ge=-180, le=180),
     name: str | None = Query(None),
+    provider: str = Query("auto", description="Weather provider: auto, yr, or open_meteo"),
     db: Session = Depends(get_db),
 ):
     try:
-        data = await fetch_weather(lat, lon)
+        data = await fetch_weather(lat, lon, provider=provider)
         try:
             crud.record_weather_log(db, lat, lon, data, location_name=name)
         except Exception as db_err:

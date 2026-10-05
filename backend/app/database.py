@@ -17,16 +17,15 @@ def _create_engine_instance(url: str):
     if url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
 
-    eng = create_engine(url, pool_pre_ping=True, connect_args=connect_args)
-
-    # If DATABASE_URL was not explicitly set and localhost Postgres is not up, fallback to SQLite
+    # If DATABASE_URL was not explicitly set and localhost Postgres is not available, fallback to SQLite
     if "DATABASE_URL" not in os.environ and url.startswith("postgresql"):
         try:
+            eng = create_engine(url, pool_pre_ping=True, connect_args=connect_args)
             with eng.connect():
-                pass
-        except Exception:
+                return eng
+        except Exception as e:
             logger.info(
-                "Local PostgreSQL is not running on localhost:5432. "
+                f"Local PostgreSQL is not available ({e}). "
                 "Using local SQLite (weather.db) fallback for local dev. "
                 "To use PostgreSQL, run via Docker Compose (`docker compose up`) or start PostgreSQL."
             )
@@ -36,7 +35,7 @@ def _create_engine_instance(url: str):
                 connect_args={"check_same_thread": False},
             )
 
-    return eng
+    return create_engine(url, pool_pre_ping=True, connect_args=connect_args)
 
 
 engine = _create_engine_instance(DATABASE_URL)

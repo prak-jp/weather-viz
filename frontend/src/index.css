@@ -1178,3 +1178,71 @@ body {
     transform: rotate(360deg);
   }
 }
+
+/* 📡 Provider Switcher & Active Provider Badge */
+.active-provider-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(14, 165, 233, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #7dd3fc;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  margin-left: 0.5rem;
+}
+
+.auto-pill {
+  color: #38bdf8;
+  font-weight: 500;
+  font-size: 0.7rem;
+}
+
+.provider-switch-group {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  padding: 3px 5px;
+  gap: 3px;
+}
+
+.provider-group-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 0.4rem 0 0.5rem;
+}
+
+.provider-pill {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #94a3b8;
+  border-radius: 9999px;
+  padding: 0.28rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.provider-pill:hover {
+  color: #e0f2fe;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.provider-pill.active {
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.3), rgba(14, 165, 233, 0.2));
+  border-color: #38bdf8;
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+}
+

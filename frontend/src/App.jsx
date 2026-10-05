@@ -32,6 +32,8 @@ export default function App() {
   const [favorites, setFavorites] = useState([]);
   const [dbStatus, setDbStatus] = useState(null);
 
+  const [provider, setProvider] = useState("auto");
+
   const loadFavorites = useCallback(async () => {
     try {
       const data = await fetchFavorites();
@@ -50,10 +52,10 @@ export default function App() {
     }
   }, []);
 
-  const loadWeather = useCallback(async (c) => {
+  const loadWeather = useCallback(async (c, p = provider) => {
     setError(null);
     try {
-      const data = await fetchWeather(c.latitude, c.longitude, c.name);
+      const data = await fetchWeather(c.latitude, c.longitude, c.name, p);
       setWeather(data);
       setLastUpdated(new Date());
     } catch {
@@ -61,7 +63,13 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [provider]);
+
+  const handleSelectProvider = (newProvider) => {
+    setProvider(newProvider);
+    setLoading(true);
+    loadWeather(city, newProvider);
+  };
 
   useEffect(() => {
     loadFavorites();
@@ -70,22 +78,22 @@ export default function App() {
 
   useEffect(() => {
     setLoading(true);
-    loadWeather(city);
-  }, [city, loadWeather]);
+    loadWeather(city, provider);
+  }, [city, provider, loadWeather]);
 
   useEffect(() => {
-    const id = setInterval(() => loadWeather(city), REFRESH_MS);
+    const id = setInterval(() => loadWeather(city, provider), REFRESH_MS);
     return () => clearInterval(id);
-  }, [city, loadWeather]);
+  }, [city, provider, loadWeather]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await loadWeather(city);
+      await loadWeather(city, provider);
     } finally {
       setTimeout(() => setIsRefreshing(false), 500);
     }
-  }, [city, loadWeather]);
+  }, [city, provider, loadWeather]);
 
   const handleSearch = (q) => searchCities(q);
   const handleSelectCity = (c) => setCity(c);
@@ -219,9 +227,47 @@ export default function App() {
                       🕒 Live: {lastUpdated.toLocaleTimeString()}
                     </span>
                   )}
+                  {weather?.provider_name && (
+                    <span
+                      className="active-provider-badge"
+                      title={`Model: ${weather.model || "Standard"}`}
+                    >
+                      {weather.provider === "yr_norway" ? "🇳🇴" : "🌐"} {weather.provider_name}
+                      {weather.auto_selected && <span className="auto-pill"> · Smart Auto</span>}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="location-actions">
+                {/* 📡 Dual-Source Provider Switcher */}
+                <div className="provider-switch-group">
+                  <span className="provider-group-label">Source:</span>
+                  <button
+                    type="button"
+                    className={`provider-pill ${provider === "auto" ? "active" : ""}`}
+                    onClick={() => handleSelectProvider("auto")}
+                    title="Intelligent Auto-Select: Uses MET Norway (Yr) for Nepal & Himalayas, Open-Meteo worldwide"
+                  >
+                    ⚡ Auto (Smart)
+                  </button>
+                  <button
+                    type="button"
+                    className={`provider-pill ${provider === "yr" ? "active" : ""}`}
+                    onClick={() => handleSelectProvider("yr")}
+                    title="Force Yr (MET Norway) European ECMWF model"
+                  >
+                    🇳🇴 Yr (MET Norway)
+                  </button>
+                  <button
+                    type="button"
+                    className={`provider-pill ${provider === "open_meteo" ? "active" : ""}`}
+                    onClick={() => handleSelectProvider("open_meteo")}
+                    title="Force Open-Meteo Ensemble with 15-min nowcast"
+                  >
+                    🌐 Open-Meteo
+                  </button>
+                </div>
+
                 <button
                   type="button"
                   className={`primary-refresh-btn ${isRefreshing ? "spinning" : ""}`}

@@ -10,11 +10,14 @@ export async function searchCities(query) {
   return data.results;
 }
 
-export async function fetchWeather(lat, lon, name = null) {
-  const url = name
-    ? `${API_BASE}/weather?lat=${lat}&lon=${lon}&name=${encodeURIComponent(name)}`
-    : `${API_BASE}/weather?lat=${lat}&lon=${lon}`;
-  const res = await fetch(url);
+export async function fetchWeather(lat, lon, name = null, provider = "auto") {
+  const params = new URLSearchParams({
+    lat,
+    lon,
+    provider: provider || "auto",
+  });
+  if (name) params.append("name", name);
+  const res = await fetch(`${API_BASE}/weather?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to load weather");
   return res.json();
 }
