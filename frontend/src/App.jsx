@@ -133,7 +133,10 @@ export default function App() {
     }
   };
 
-  const tz = weather?.location?.timezone ?? "UTC";
+  const tz =
+    !weather?.location?.timezone || weather.location.timezone === "auto"
+      ? "Asia/Kathmandu"
+      : weather.location.timezone;
 
   return (
     <div className="app">

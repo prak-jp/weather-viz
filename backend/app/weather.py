@@ -313,7 +313,7 @@ async def fetch_yr_weather(latitude: float, longitude: float) -> dict:
         "location": {
             "latitude": latitude,
             "longitude": longitude,
-            "timezone": "auto",
+            "timezone": "Asia/Kathmandu" if is_himalayan_or_nepal(latitude, longitude) else "UTC",
         },
         "current": {
             "temperature_2m": temp,

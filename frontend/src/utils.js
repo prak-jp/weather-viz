@@ -27,20 +27,37 @@ export function weatherIcon(code) {
 }
 
 export function formatTime(isoString, timezone) {
-  return new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: timezone,
-  }).format(new Date(isoString));
+  try {
+    const tz = !timezone || timezone === "auto" ? undefined : timezone;
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: tz,
+    }).format(new Date(isoString));
+  } catch {
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(isoString));
+  }
 }
 
 export function formatDay(isoString, timezone) {
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    timeZone: timezone,
-  }).format(new Date(isoString));
+  try {
+    const tz = !timezone || timezone === "auto" ? undefined : timezone;
+    return new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      timeZone: tz,
+    }).format(new Date(isoString));
+  } catch {
+    return new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    }).format(new Date(isoString));
+  }
 }
 
 export function windDirection(degrees) {
