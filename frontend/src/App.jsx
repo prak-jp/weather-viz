@@ -78,6 +78,15 @@ export default function App() {
     return () => clearInterval(id);
   }, [city, loadWeather]);
 
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await loadWeather(city);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  }, [city, loadWeather]);
+
   const handleSearch = (q) => searchCities(q);
   const handleSelectCity = (c) => setCity(c);
 
@@ -136,7 +145,20 @@ export default function App() {
               </span>
             )}
           </div>
-          <SearchBar onSearch={handleSearch} onSelect={handleSelectCity} currentCity={city} />
+          <div className="header-controls">
+            <SearchBar onSearch={handleSearch} onSelect={handleSelectCity} currentCity={city} />
+            <button
+              type="button"
+              className={`header-refresh-btn ${isRefreshing ? "spinning" : ""}`}
+              onClick={handleRefresh}
+              title="Force refresh live weather data now"
+            >
+              <span className="refresh-icon">🔄</span>
+              <span className="refresh-btn-text">
+                {isRefreshing ? "Refreshing..." : "Refresh"}
+              </span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -191,38 +213,64 @@ export default function App() {
                   {city.admin1 ? `, ${city.admin1}` : ""}
                   {city.country ? ` · ${city.country}` : ""}
                 </h2>
-                {lastUpdated && (
-                  <span className="updated">
-                    Updated {lastUpdated.toLocaleTimeString()}
-                    <button
-                      type="button"
-                      className={`refresh-weather-btn ${isRefreshing ? "spinning" : ""}`}
-                      onClick={async () => {
-                        setIsRefreshing(true);
-                        await loadWeather(city);
-                        setIsRefreshing(false);
-                      }}
-                      title="Force refresh live weather data now"
-                    >
-                      <span className="refresh-icon">🔄</span> Refresh
-                    </button>
-                  </span>
-                )}
-
+                <div className="location-meta-row">
+                  {lastUpdated && (
+                    <span className="updated-badge">
+                      🕒 Live: {lastUpdated.toLocaleTimeString()}
+                    </span>
+                  )}
+                </div>
               </div>
-              <button
-                className={`fav-toggle-btn ${isFavorite ? "is-fav" : ""}`}
-                onClick={handleToggleFavorite}
-                title={isFavorite ? "Remove from favorites" : "Save to favorites"}
-              >
-                {isFavorite ? "★ Saved in Favorites" : "☆ Add to Favorites"}
-              </button>
+              <div className="location-actions">
+                <button
+                  type="button"
+                  className={`primary-refresh-btn ${isRefreshing ? "spinning" : ""}`}
+                  onClick={handleRefresh}
+                  title="Force refresh live weather data now"
+                >
+                  <span className="refresh-icon">🔄</span>
+                  <span>{isRefreshing ? "Refreshing..." : "Refresh Weather"}</span>
+                </button>
+                <button
+                  className={`fav-toggle-btn ${isFavorite ? "is-fav" : ""}`}
+                  onClick={handleToggleFavorite}
+                  title={isFavorite ? "Remove from favorites" : "Save to favorites"}
+                >
+                  {isFavorite ? "★ Saved in Favorites" : "☆ Add to Favorites"}
+                </button>
+              </div>
             </div>
 
             <CurrentWeather current={weather.current} />
-            <LiveMap city={city} weather={weather} onSelectCity={handleSelectCity} />
+            <LiveMap
+              city={city}
+              weather={weather}
+              onSelectCity={handleSelectCity}
+              onRefresh={handleRefresh}
+              isRefreshing={isRefreshing}
+            />
             <HourlyChart hourly={weather.hourly} timezone={tz} />
             <DailyForecast daily={weather.daily} timezone={tz} />
+
+            {/* 🔄 Floating Quick Refresh Pill (always accessible when scrolling) */}
+            <div className="floating-refresh-container">
+              <button
+                type="button"
+                className={`floating-refresh-btn ${isRefreshing ? "spinning" : ""}`}
+                onClick={handleRefresh}
+                title="Click to force refresh live weather data"
+              >
+                <span className="refresh-icon">🔄</span>
+                <span className="floating-btn-text">
+                  {isRefreshing ? "Refreshing..." : "Refresh Live"}
+                </span>
+                {lastUpdated && (
+                  <span className="floating-btn-time">
+                    {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                )}
+              </button>
+            </div>
           </>
         )}
       </main>

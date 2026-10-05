@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Circle,
   CircleMarker,
@@ -99,7 +99,7 @@ function TempMarker({ position, temp, label }) {
   );
 }
 
-export default function LiveMap({ city, weather, onSelectCity }) {
+export default function LiveMap({ city, weather, onSelectCity, onRefresh, isRefreshing }) {
   const lat = city.latitude;
   const lon = city.longitude;
   const current = weather?.current;
@@ -119,6 +119,7 @@ export default function LiveMap({ city, weather, onSelectCity }) {
   const [isRadarPlaying, setIsRadarPlaying] = useState(false);
   const [radarColorScheme, setRadarColorScheme] = useState(4); // 4 = Vibrant Weather Channel Doppler
   const [radarOpacity, setRadarOpacity] = useState(0.78);
+  const [isMapRefreshing, setIsMapRefreshing] = useState(false);
 
   // Map tile style state
   const [mapTheme, setMapTheme] = useState("clear");
@@ -183,30 +184,40 @@ export default function LiveMap({ city, weather, onSelectCity }) {
   }, []);
 
   // 📡 Fetch Doppler Radar Frames
-  useEffect(() => {
-    let cancelled = false;
-    const loadRadar = async () => {
-      try {
-        const res = await fetch("https://api.rainviewer.com/public/weather-maps.json");
-        if (!res.ok) return;
-        const data = await res.json();
-        const frames = data.radar?.past || [];
-        if (!cancelled && frames.length > 0 && data.host) {
-          setRadarHost(data.host);
-          setRadarFrames(frames);
-          setCurrentFrameIdx(frames.length - 1);
-        }
-      } catch {
-        /* radar is optional */
+  const fetchRadarData = useCallback(async () => {
+    try {
+      const res = await fetch(`https://api.rainviewer.com/public/weather-maps.json?t=${Date.now()}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const frames = data.radar?.past || [];
+      if (frames.length > 0 && data.host) {
+        setRadarHost(data.host);
+        setRadarFrames(frames);
+        setCurrentFrameIdx(frames.length - 1);
       }
-    };
-    loadRadar();
-    const id = setInterval(loadRadar, 180_000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
+    } catch {
+      /* radar is optional */
+    }
   }, []);
+
+  useEffect(() => {
+    fetchRadarData();
+    const id = setInterval(fetchRadarData, 180_000);
+    return () => clearInterval(id);
+  }, [fetchRadarData]);
+
+  // Handle manual Map & Radar Refresh
+  const handleMapRefresh = async () => {
+    setIsMapRefreshing(true);
+    try {
+      await Promise.all([
+        fetchRadarData(),
+        onRefresh ? onRefresh() : Promise.resolve(),
+      ]);
+    } finally {
+      setTimeout(() => setIsMapRefreshing(false), 500);
+    }
+  };
 
   // 📡 Auto-play Radar Timeline Animation
   useEffect(() => {
@@ -329,6 +340,17 @@ export default function LiveMap({ city, weather, onSelectCity }) {
             )}
           </div>
           <div className="layer-pills">
+            {/* 🔄 Refresh Radar & Map Button */}
+            <button
+              type="button"
+              className={`layer-pill refresh-pill ${isMapRefreshing || isRefreshing ? "active spinning" : ""}`}
+              onClick={handleMapRefresh}
+              title="Click to force-refresh radar imagery and weather data"
+            >
+              <span className="refresh-icon">🔄</span>
+              <span>{isMapRefreshing || isRefreshing ? "Refreshing..." : "Refresh Radar & Map"}</span>
+            </button>
+
             {/* Map Clarity & Style Switcher */}
             <button
               className="layer-pill active"
