@@ -39,7 +39,12 @@ app.add_middleware(
 )
 
 
-@app.get("/api/health")
+@app.head("/")
+async def head_root():
+    return {"status": "ok"}
+
+
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health(db: Session = Depends(get_db)):
     db_connected = False
     try:
@@ -191,7 +196,7 @@ if os.path.exists(STATIC_DIR):
     if os.path.exists(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
-    @app.get("/{full_path:path}")
+    @app.api_route("/{full_path:path}", methods=["GET", "HEAD"])
     async def serve_spa(full_path: str):
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="API route not found")
