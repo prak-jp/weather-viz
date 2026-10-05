@@ -214,37 +214,41 @@ export default function App() {
 
         {weather && (
           <>
-            <div className="location-bar">
-              <div>
-                <h2>
-                  {city.name}
-                  {city.admin1 ? `, ${city.admin1}` : ""}
-                  {city.country ? ` · ${city.country}` : ""}
-                </h2>
-                <div className="location-meta-row">
-                  {lastUpdated && (
-                    <span className="updated-badge">
-                      🕒 Live: {lastUpdated.toLocaleTimeString()}
+            {/* 🌟 Modern Revamped Dashboard Hero Bar */}
+            <div className="dashboard-hero-bar">
+              <div className="hero-left">
+                <div className="city-title-group">
+                  <h2 className="city-name">
+                    {city.name}
+                    {city.admin1 ? <span className="city-admin1">, {city.admin1}</span> : ""}
+                    {city.country ? <span className="city-country"> · {city.country}</span> : ""}
+                  </h2>
+                  <div className="meta-badges-row">
+                    <span className="live-status-pill">
+                      <span className="live-dot" /> LIVE NOW
                     </span>
-                  )}
-                  {weather?.provider_name && (
-                    <span
-                      className="active-provider-badge"
-                      title={`Model: ${weather.model || "Standard"}`}
-                    >
-                      {weather.provider === "yr_norway" ? "🇳🇴" : "🌐"} {weather.provider_name}
-                      {weather.auto_selected && <span className="auto-pill"> · Smart Auto</span>}
-                    </span>
-                  )}
+                    {lastUpdated && (
+                      <span className="updated-timestamp">
+                        Updated {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                      </span>
+                    )}
+                    {weather?.provider_name && (
+                      <span className="provider-tag-pill" title={`Forecasting Model: ${weather.model}`}>
+                        {weather.provider === "yr_norway" ? "🇳🇴" : "🌐"} {weather.provider_name}
+                        {weather.auto_selected && <span className="auto-text"> · Smart Auto</span>}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="location-actions">
-                {/* 📡 Dual-Source Provider Switcher */}
-                <div className="provider-switch-group">
-                  <span className="provider-group-label">Source:</span>
+
+              <div className="hero-right">
+                {/* 📡 Source Switcher (Segmented Control) */}
+                <div className="source-segmented-control">
+                  <span className="source-label">Source:</span>
                   <button
                     type="button"
-                    className={`provider-pill ${provider === "auto" ? "active" : ""}`}
+                    className={`source-btn ${provider === "auto" ? "active" : ""}`}
                     onClick={() => handleSelectProvider("auto")}
                     title="Intelligent Auto-Select: Uses MET Norway (Yr) for Nepal & Himalayas, Open-Meteo worldwide"
                   >
@@ -252,15 +256,15 @@ export default function App() {
                   </button>
                   <button
                     type="button"
-                    className={`provider-pill ${provider === "yr" ? "active" : ""}`}
+                    className={`source-btn ${provider === "yr" ? "active" : ""}`}
                     onClick={() => handleSelectProvider("yr")}
                     title="Force Yr (MET Norway) European ECMWF model"
                   >
-                    🇳🇴 Yr (MET Norway)
+                    🇳🇴 Yr (Norway)
                   </button>
                   <button
                     type="button"
-                    className={`provider-pill ${provider === "open_meteo" ? "active" : ""}`}
+                    className={`source-btn ${provider === "open_meteo" ? "active" : ""}`}
                     onClick={() => handleSelectProvider("open_meteo")}
                     title="Force Open-Meteo Ensemble with 15-min nowcast"
                   >
@@ -268,26 +272,37 @@ export default function App() {
                   </button>
                 </div>
 
+                {/* 🔄 Primary Refresh Button */}
                 <button
                   type="button"
-                  className={`primary-refresh-btn ${isRefreshing ? "spinning" : ""}`}
+                  className={`btn-hero-refresh ${isRefreshing ? "spinning" : ""}`}
                   onClick={handleRefresh}
-                  title="Force refresh live weather data now"
+                  title="Click to force-refresh all live weather and radar data"
                 >
                   <span className="refresh-icon">🔄</span>
-                  <span>{isRefreshing ? "Refreshing..." : "Refresh Weather"}</span>
+                  <span className="btn-text">{isRefreshing ? "Updating..." : "Refresh Live"}</span>
                 </button>
+
+                {/* ⭐ Favorite Toggle Button */}
                 <button
-                  className={`fav-toggle-btn ${isFavorite ? "is-fav" : ""}`}
+                  type="button"
+                  className={`btn-hero-fav ${isFavorite ? "is-fav" : ""}`}
                   onClick={handleToggleFavorite}
                   title={isFavorite ? "Remove from favorites" : "Save to favorites"}
                 >
-                  {isFavorite ? "★ Saved in Favorites" : "☆ Add to Favorites"}
+                  {isFavorite ? "★ Saved" : "☆ Favorite"}
                 </button>
               </div>
             </div>
 
-            <CurrentWeather current={weather.current} />
+            <CurrentWeather
+              current={weather.current}
+              providerInfo={{
+                provider: weather.provider,
+                provider_name: weather.provider_name,
+                model: weather.model,
+              }}
+            />
             <LiveMap
               city={city}
               weather={weather}

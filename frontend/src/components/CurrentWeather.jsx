@@ -1,10 +1,20 @@
-﻿import { weatherIcon, windDirection } from "../utils";
+import { weatherIcon, windDirection } from "../utils";
 
-export default function CurrentWeather({ current }) {
+export default function CurrentWeather({ current, providerInfo }) {
   const icon = weatherIcon(current.weather_code);
 
   return (
     <section className="current-weather card">
+      <div className="cw-top-row">
+        <span className="card-title">Live Weather Overview</span>
+        {providerInfo?.provider_name && (
+          <span className="cw-provider-badge" title={providerInfo.model}>
+            Source: <strong>{providerInfo.provider === "yr_norway" ? "🇳🇴 MET Norway (Yr)" : "🌐 Open-Meteo"}</strong>
+            {providerInfo.model ? ` (${providerInfo.model})` : ""}
+          </span>
+        )}
+      </div>
+
       <div className="cw-main">
         <span className="cw-icon">{icon}</span>
         <div className="cw-temp">
