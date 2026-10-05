@@ -18,7 +18,7 @@ import { fetchMapOverlay, fetchNepalRivers, fetchWeather } from "../api";
 import { RISK_COLORS, RISK_LABELS, tempColor } from "../risk";
 import { weatherIcon } from "../utils";
 import RiskSidebar from "./RiskSidebar";
-import RainEffect from "./RainEffect";
+import LocalizedRainOverlay from "./LocalizedRainOverlay";
 import { NEPAL_RIVER_PATHS } from "../data/nepalRivers";
 import { NEPAL_BORDER_COORDINATES } from "../data/nepalBoundary";
 
@@ -31,23 +31,40 @@ L.Icon.Default.mergeOptions({
 });
 
 const MAP_THEMES = {
-  clear: {
-    name: "🗺️ Style: Clear",
-    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-    subdomains: ["a", "b", "c", "d"],
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  googleHybrid: {
+    name: "🌍 Google Hybrid (Satellite + Roads)",
+    url: "https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+    subdomains: ["mt0", "mt1", "mt2", "mt3"],
+    maxZoom: 20,
+    attribution: '&copy; <a href="https://maps.google.com/">Google Maps</a>',
   },
-  dark: {
-    name: "🌙 Style: Dark",
-    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-    subdomains: ["a", "b", "c", "d"],
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  googleStreets: {
+    name: "🗺️ Google Roads & Cities",
+    url: "https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+    subdomains: ["mt0", "mt1", "mt2", "mt3"],
+    maxZoom: 20,
+    attribution: '&copy; <a href="https://maps.google.com/">Google Maps</a>',
+  },
+  googleTerrain: {
+    name: "⛰️ Google Terrain (Mountains)",
+    url: "https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
+    subdomains: ["mt0", "mt1", "mt2", "mt3"],
+    maxZoom: 20,
+    attribution: '&copy; <a href="https://maps.google.com/">Google Maps</a>',
   },
   satellite: {
-    name: "🛰️ Style: Satellite",
+    name: "🛰️ Esri Clarity Satellite",
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     subdomains: [],
+    maxZoom: 19,
     attribution: '&copy; <a href="https://www.esri.com/">Esri</a>',
+  },
+  clear: {
+    name: "🏙️ Carto Clean Vector",
+    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    subdomains: ["a", "b", "c", "d"],
+    maxZoom: 20,
+    attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
   },
 };
 
@@ -121,24 +138,48 @@ export default function LiveMap({ city, weather, onSelectCity, onRefresh, isRefr
   const [radarOpacity, setRadarOpacity] = useState(0.78);
   const [isMapRefreshing, setIsMapRefreshing] = useState(false);
 
-  // Map tile style state
-  const [mapTheme, setMapTheme] = useState("clear");
+  // Map tile style state (Default to Google Hybrid)
+  const [mapTheme, setMapTheme] = useState("googleHybrid");
 
   // Map Click Inspection State
   const [inspectPoint, setInspectPoint] = useState(null);
 
   // Check if current location or inspected point has active rain
   const currentHasRain =
-    current?.precipitation > 0 ||
+    (current?.precipitation ?? 0) > 0 ||
     [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99].includes(
       current?.weather_code
     );
   const inspectHasRain =
-    inspectPoint?.weather?.current?.precipitation > 0 ||
+    (inspectPoint?.weather?.current?.precipitation ?? 0) > 0 ||
     [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99].includes(
       inspectPoint?.weather?.current?.weather_code
     );
   const isRaining = currentHasRain || inspectHasRain;
+
+  // Active Rain Zones for Localized Rain Effect (strictly pinned to raining areas)
+  const activeRainZones = useMemo(() => {
+    const list = [];
+    if (currentHasRain) {
+      list.push({
+        lat,
+        lon,
+        name: city.name,
+        radiusKm: 24,
+        precip: current?.precipitation ?? 1.5,
+      });
+    }
+    if (inspectPoint && inspectHasRain) {
+      list.push({
+        lat: inspectPoint.lat,
+        lon: inspectPoint.lon,
+        name: "Inspected Location",
+        radiusKm: 18,
+        precip: inspectPoint.weather?.current?.precipitation ?? 1.5,
+      });
+    }
+    return list;
+  }, [currentHasRain, inspectHasRain, lat, lon, city.name, inspectPoint, current?.precipitation]);
 
   const [layers, setLayers] = useState({
     temp: true,
@@ -351,14 +392,19 @@ export default function LiveMap({ city, weather, onSelectCity, onRefresh, isRefr
               <span>{isMapRefreshing || isRefreshing ? "Refreshing..." : "Refresh Radar & Map"}</span>
             </button>
 
-            {/* Map Clarity & Style Switcher */}
+            {/* Map Base Layer Switcher (Google Hybrid / Google Roads / Google Terrain / Esri / Carto) */}
             <button
+              type="button"
               className="layer-pill active"
-              style={{ borderColor: "#38bdf8", color: "#e0f2fe" }}
-              onClick={() =>
-                setMapTheme((t) => (t === "clear" ? "dark" : t === "dark" ? "satellite" : "clear"))
-              }
-              title="Click to toggle between Clear, Dark, and Satellite map styles"
+              style={{ borderColor: "#38bdf8", color: "#e0f2fe", fontWeight: 600 }}
+              onClick={() => {
+                const keys = Object.keys(MAP_THEMES);
+                setMapTheme((t) => {
+                  const idx = keys.indexOf(t);
+                  return keys[(idx + 1) % keys.length];
+                });
+              }}
+              title="Click to switch base map (Google Hybrid, Google Roads, Google Terrain, Esri, Carto)"
             >
               {currentTheme.name}
             </button>
@@ -389,11 +435,14 @@ export default function LiveMap({ city, weather, onSelectCity, onRefresh, isRefr
               🌡 Temp
             </button>
             <button
-              className={`layer-pill${layers.rainEffect ? " active" : ""}`}
+              type="button"
+              className={`layer-pill${layers.rainEffect && activeRainZones.length > 0 ? " active" : ""}`}
               onClick={() => setLayers((s) => ({ ...s, rainEffect: !s.rainEffect }))}
-              title="Toggle falling rain particle effect"
+              title="Toggle localized rain storm particles (only active where rain is actually detected)"
             >
-              {layers.rainEffect ? "💧 Rain Effect: ON" : "💧 Rain Effect: OFF"}
+              {activeRainZones.length > 0
+                ? (layers.rainEffect ? "🌧️ Local Rain: ON" : "🌧️ Local Rain: OFF")
+                : "☀️ No Rain Detected"}
             </button>
             <button
               className={`layer-pill${layers.nepalRivers ? " active" : ""}`}
@@ -420,18 +469,6 @@ export default function LiveMap({ city, weather, onSelectCity, onRefresh, isRefr
 
         <div className="map-layout">
           <div className="map-frame">
-            {/* 🌧️ Realistic Falling Rain Overlay */}
-            <RainEffect
-              active={layers.rainEffect && (isRaining || layers.rainEffect || layers.liveRainCloud)}
-              intensity={
-                (current?.precipitation ?? 0) > 3 || (inspectPoint?.weather?.current?.precipitation ?? 0) > 3
-                  ? "heavy"
-                  : isRaining || layers.liveRainCloud
-                  ? "moderate"
-                  : "light"
-              }
-            />
-
             <MapContainer
               center={[lat, lon]}
               zoom={8}
@@ -443,14 +480,20 @@ export default function LiveMap({ city, weather, onSelectCity, onRefresh, isRefr
               <Recenter lat={lat} lon={lon} focus={focus} />
               <MapClickHandler onMapClick={handleMapClick} />
 
-              {/* Crystal-clear Base Tile Layer */}
+              {/* 🌧️ Localized Rain Particles & Ripples (Strictly pinned to raining geographic zones) */}
+              <LocalizedRainOverlay
+                zones={activeRainZones}
+                active={layers.rainEffect}
+              />
+
+              {/* High-Definition Base Tile Layer (Google Maps / Esri / Carto) */}
               <TileLayer
                 key={mapTheme}
                 url={currentTheme.url}
-                subdomains={currentTheme.subdomains}
+                subdomains={currentTheme.subdomains || []}
                 attribution={currentTheme.attribution}
                 minNativeZoom={0}
-                maxNativeZoom={20}
+                maxNativeZoom={currentTheme.maxZoom || 20}
                 maxZoom={20}
               />
 
