@@ -8,7 +8,7 @@ services:
   # 1. FastAPI Backend (Docker)
   - type: web
     name: weather-viz-backend
-    runtime: docker
+    env: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     plan: free
@@ -23,7 +23,7 @@ services:
   # 2. React Frontend (Static Site)
   - type: web
     name: weather-viz-frontend
-    runtime: static
+    env: static
     plan: free
     rootDir: frontend
     buildCommand: npm install && npm run build
@@ -37,4 +37,4 @@ services:
         fromService:
           type: web
           name: weather-viz-backend
-          property: url
+          property: host
