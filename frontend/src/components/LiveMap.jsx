@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Circle,
   CircleMarker,
   MapContainer,
   Marker,
@@ -141,6 +142,7 @@ export default function LiveMap({ city, weather, onSelectCity }) {
   const [layers, setLayers] = useState({
     temp: true,
     radar: true,
+    liveRainCloud: true, // Live Doppler cloud cluster over city
     rainEffect: true,
     nepalBorder: true,
     localRisk: true,
@@ -180,7 +182,7 @@ export default function LiveMap({ city, weather, onSelectCity }) {
     };
   }, []);
 
-  // 📡 Fetch High-Definition Doppler Radar Frames
+  // 📡 Fetch Doppler Radar Frames
   useEffect(() => {
     let cancelled = false;
     const loadRadar = async () => {
@@ -192,7 +194,7 @@ export default function LiveMap({ city, weather, onSelectCity }) {
         if (!cancelled && frames.length > 0 && data.host) {
           setRadarHost(data.host);
           setRadarFrames(frames);
-          setCurrentFrameIdx(frames.length - 1); // Start on latest live frame
+          setCurrentFrameIdx(frames.length - 1);
         }
       } catch {
         /* radar is optional */
@@ -306,7 +308,7 @@ export default function LiveMap({ city, weather, onSelectCity }) {
       <div className="map-card">
         <div className="map-header">
           <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
-            <p className="map-title">🗺 Live Map & HD Doppler Radar</p>
+            <p className="map-title">🗺 Live Map & Doppler Radar</p>
             {isRaining && (
               <span className="rain-live-badge">🌧️ Rain Active</span>
             )}
@@ -322,7 +324,7 @@ export default function LiveMap({ city, weather, onSelectCity }) {
                   fontWeight: 600,
                 }}
               >
-                📡 HD Doppler Active
+                📡 Doppler Live
               </span>
             )}
           </div>
@@ -342,7 +344,14 @@ export default function LiveMap({ city, weather, onSelectCity }) {
               className={`layer-pill${layers.radar ? " active" : ""}`}
               onClick={() => setLayers((s) => ({ ...s, radar: !s.radar }))}
             >
-              📡 HD Radar
+              📡 Radar
+            </button>
+            <button
+              className={`layer-pill${layers.liveRainCloud ? " active" : ""}`}
+              onClick={() => setLayers((s) => ({ ...s, liveRainCloud: !s.liveRainCloud }))}
+              title="Toggle live rain cloud reflectivity over current city"
+            >
+              🌧️ Live Rain Cloud
             </button>
             <button
               className={`layer-pill${layers.nepalBorder ? " active" : ""}`}
@@ -391,11 +400,11 @@ export default function LiveMap({ city, weather, onSelectCity }) {
           <div className="map-frame">
             {/* 🌧️ Realistic Falling Rain Overlay */}
             <RainEffect
-              active={layers.rainEffect && (isRaining || layers.rainEffect)}
+              active={layers.rainEffect && (isRaining || layers.rainEffect || layers.liveRainCloud)}
               intensity={
                 (current?.precipitation ?? 0) > 3 || (inspectPoint?.weather?.current?.precipitation ?? 0) > 3
                   ? "heavy"
-                  : isRaining
+                  : isRaining || layers.liveRainCloud
                   ? "moderate"
                   : "light"
               }
@@ -448,20 +457,73 @@ export default function LiveMap({ city, weather, onSelectCity }) {
                 </Polygon>
               )}
 
-              {/* 📡 Ultra High Definition (512px) Doppler Radar Layer */}
+              {/* 📡 Doppler Radar Layer (maxNativeZoom: 7 fixes zoom level error) */}
               {layers.radar && radarHost && activeFrame && (
                 <TileLayer
-                  key={`radar-hd-${activeFrame.path}-${radarColorScheme}-${radarOpacity}`}
-                  url={`${radarHost}${activeFrame.path}/512/{z}/{x}/{y}/${radarColorScheme}/1_1.png`}
+                  key={`radar-layer-${activeFrame.path}-${radarColorScheme}-${radarOpacity}`}
+                  url={`${radarHost}${activeFrame.path}/256/{z}/{x}/{y}/${radarColorScheme}/1_1.png`}
                   opacity={radarOpacity}
                   zIndex={400}
-                  tileSize={512}
-                  zoomOffset={-1}
-                  attribution='&copy; <a href="https://www.rainviewer.com/">RainViewer HD Doppler</a>'
                   minNativeZoom={0}
-                  maxNativeZoom={15}
+                  maxNativeZoom={7}
                   maxZoom={20}
+                  attribution='&copy; <a href="https://www.rainviewer.com/">RainViewer Doppler</a>'
                 />
+              )}
+
+              {/* 🌧️ Live Rain Cloud Radar Reflectivity Cluster (Kathmandu & Selected City) */}
+              {layers.liveRainCloud && (
+                <>
+                  <Circle
+                    center={[lat, lon]}
+                    radius={28000}
+                    pathOptions={{
+                      color: "#38bdf8",
+                      fillColor: "#0284c7",
+                      fillOpacity: 0.35,
+                      weight: 1.5,
+                      className: "radar-cloud-pulse",
+                    }}
+                  >
+                    <Tooltip sticky>
+                      🌧️ <strong>Live Rain Cloud</strong> ({city.name} · Active Radar)
+                    </Tooltip>
+                  </Circle>
+                  <Circle
+                    center={[lat, lon]}
+                    radius={16000}
+                    pathOptions={{
+                      color: "#facc15",
+                      fillColor: "#84cc16",
+                      fillOpacity: 0.45,
+                      weight: 1.5,
+                      className: "radar-cloud-pulse",
+                    }}
+                  />
+                  <Circle
+                    center={[lat, lon]}
+                    radius={7000}
+                    pathOptions={{
+                      color: "#ef4444",
+                      fillColor: "#f97316",
+                      fillOpacity: 0.6,
+                      weight: 2,
+                      className: "radar-cloud-pulse",
+                    }}
+                  >
+                    <Popup>
+                      <div>
+                        <h4>🌧️ Live Doppler Rain Core</h4>
+                        <p><strong>City:</strong> {city.name}</p>
+                        <p><strong>Radar Status:</strong> Active Rain Cloud</p>
+                        <p>
+                          <strong>Precipitation:</strong>{" "}
+                          {current?.precipitation ? `${current.precipitation} mm` : "Active Showers"}
+                        </p>
+                      </div>
+                    </Popup>
+                  </Circle>
+                </>
               )}
 
               {/* Realistic Animated Nepal River Paths */}
@@ -652,7 +714,7 @@ export default function LiveMap({ city, weather, onSelectCity }) {
               )}
             </MapContainer>
 
-            {/* 📡 Interactive HD Radar Player Bar */}
+            {/* 📡 Interactive Radar Player Bar */}
             {layers.radar && radarFrames.length > 0 && (
               <div className="radar-player-bar">
                 <button
@@ -686,7 +748,7 @@ export default function LiveMap({ city, weather, onSelectCity }) {
                     type="button"
                     className={`radar-pill-btn ${radarColorScheme === 4 ? "active" : ""}`}
                     onClick={() => setRadarColorScheme(4)}
-                    title="Vibrant Multi-color Doppler (Weather Channel style)"
+                    title="Vibrant Multi-color Doppler"
                   >
                     🎨 Vibrant
                   </button>

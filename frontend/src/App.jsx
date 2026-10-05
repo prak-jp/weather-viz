@@ -20,12 +20,13 @@ const DEFAULT_CITY = {
   longitude: 85.324,
 };
 
-const REFRESH_MS = 60_000;
+const REFRESH_MS = 30_000;
 
 export default function App() {
   const [city, setCity] = useState(DEFAULT_CITY);
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [favorites, setFavorites] = useState([]);
@@ -191,8 +192,23 @@ export default function App() {
                   {city.country ? ` · ${city.country}` : ""}
                 </h2>
                 {lastUpdated && (
-                  <span className="updated">Updated {lastUpdated.toLocaleTimeString()}</span>
+                  <span className="updated">
+                    Updated {lastUpdated.toLocaleTimeString()}
+                    <button
+                      type="button"
+                      className={`refresh-weather-btn ${isRefreshing ? "spinning" : ""}`}
+                      onClick={async () => {
+                        setIsRefreshing(true);
+                        await loadWeather(city);
+                        setIsRefreshing(false);
+                      }}
+                      title="Force refresh live weather data now"
+                    >
+                      <span className="refresh-icon">🔄</span> Refresh
+                    </button>
+                  </span>
                 )}
+
               </div>
               <button
                 className={`fav-toggle-btn ${isFavorite ? "is-fav" : ""}`}

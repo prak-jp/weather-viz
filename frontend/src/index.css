@@ -996,5 +996,42 @@ body {
   color: #e0f2fe;
 }
 
+/* 🌧️ Live Rain Cloud Radar Reflectivity Pulse */
+.radar-cloud-pulse {
+  animation: radarCloudPulse 2.5s ease-in-out infinite alternate;
+  pointer-events: none;
+}
 
+@keyframes radarCloudPulse {
+  0% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 0.85;
+  }
+}
 
+.refresh-weather-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 9999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: 0.5rem;
+  transition: 0.2s;
+}
+
+.refresh-weather-btn:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38bdf8;
+  color: #e0f2fe;
+}
+
+.refresh-weather-btn.spinning .refresh-icon {
+  animation: spin 0.8s linear infinite;
+}

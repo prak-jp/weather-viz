@@ -52,7 +52,8 @@ async def fetch_weather(latitude: float, longitude: float) -> dict:
     params = {
         "latitude": latitude,
         "longitude": longitude,
-        "current": "temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure",
+        "current": "temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure",
+        "minutely_15": "precipitation,weather_code",
         "hourly": "temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m",
         "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code,sunrise,sunset",
         "timezone": "auto",
@@ -65,6 +66,18 @@ async def fetch_weather(latitude: float, longitude: float) -> dict:
         data = response.json()
 
     current = data["current"]
+
+    # Check 15-minute high-resolution nowcast for immediate local rain detection
+    minutely = data.get("minutely_15", {})
+    if minutely.get("precipitation") and len(minutely["precipitation"]) > 0:
+        latest_precip = minutely["precipitation"][0]
+        latest_code = minutely.get("weather_code", [None])[0]
+        # If immediate nowcast detects rain, incorporate it
+        if latest_precip > current.get("precipitation", 0):
+            current["precipitation"] = latest_precip
+        if latest_code is not None and latest_code > 50 and current.get("weather_code", 0) < 50:
+            current["weather_code"] = latest_code
+
     code = current.get("weather_code", 0)
 
     return {
