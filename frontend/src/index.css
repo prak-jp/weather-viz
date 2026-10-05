@@ -915,4 +915,86 @@ body {
   50% { opacity: 1; }
 }
 
+/* 📡 HD Doppler Radar Player Bar */
+.radar-player-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 1.25rem;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.radar-play-btn {
+  background: #0284c7;
+  color: white;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: 0.2s;
+  box-shadow: 0 0 10px rgba(2, 132, 199, 0.4);
+}
+
+.radar-play-btn:hover {
+  background: #38bdf8;
+  transform: scale(1.08);
+}
+
+.radar-timeline-wrap {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.radar-slider {
+  flex: 1;
+  height: 6px;
+  accent-color: #38bdf8;
+  cursor: pointer;
+}
+
+.radar-time-tag {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #bae6fd;
+  white-space: nowrap;
+}
+
+.radar-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.radar-pill-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.radar-pill-btn:hover,
+.radar-pill-btn.active {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #e0f2fe;
+}
+
+
 

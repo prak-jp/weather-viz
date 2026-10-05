@@ -109,10 +109,17 @@ export default function LiveMap({ city, weather, onSelectCity }) {
   const [overlay, setOverlay] = useState(null);
   const [nepal, setNepal] = useState(null);
   const [error, setError] = useState(null);
-  const [radarUrl, setRadarUrl] = useState(null);
   const [focus, setFocus] = useState(null);
 
-  // Map tile style state (Clear by default for maximum visibility)
+  // 📡 HD Radar State
+  const [radarHost, setRadarHost] = useState(null);
+  const [radarFrames, setRadarFrames] = useState([]);
+  const [currentFrameIdx, setCurrentFrameIdx] = useState(0);
+  const [isRadarPlaying, setIsRadarPlaying] = useState(false);
+  const [radarColorScheme, setRadarColorScheme] = useState(4); // 4 = Vibrant Weather Channel Doppler
+  const [radarOpacity, setRadarOpacity] = useState(0.78);
+
+  // Map tile style state
   const [mapTheme, setMapTheme] = useState("clear");
 
   // Map Click Inspection State
@@ -173,6 +180,7 @@ export default function LiveMap({ city, weather, onSelectCity }) {
     };
   }, []);
 
+  // 📡 Fetch High-Definition Doppler Radar Frames
   useEffect(() => {
     let cancelled = false;
     const loadRadar = async () => {
@@ -181,9 +189,10 @@ export default function LiveMap({ city, weather, onSelectCity }) {
         if (!res.ok) return;
         const data = await res.json();
         const frames = data.radar?.past || [];
-        const latest = frames[frames.length - 1];
-        if (!cancelled && latest && data.host) {
-          setRadarUrl(`${data.host}${latest.path}/256/{z}/{x}/{y}/2/1_1.png`);
+        if (!cancelled && frames.length > 0 && data.host) {
+          setRadarHost(data.host);
+          setRadarFrames(frames);
+          setCurrentFrameIdx(frames.length - 1); // Start on latest live frame
         }
       } catch {
         /* radar is optional */
@@ -196,6 +205,15 @@ export default function LiveMap({ city, weather, onSelectCity }) {
       clearInterval(id);
     };
   }, []);
+
+  // 📡 Auto-play Radar Timeline Animation
+  useEffect(() => {
+    if (!isRadarPlaying || radarFrames.length === 0) return;
+    const interval = setInterval(() => {
+      setCurrentFrameIdx((prev) => (prev + 1) % radarFrames.length);
+    }, 650);
+    return () => clearInterval(interval);
+  }, [isRadarPlaying, radarFrames.length]);
 
   // Handle clicking anywhere on the map to inspect live weather
   const handleMapClick = async (clickedLat, clickedLon) => {
@@ -274,15 +292,38 @@ export default function LiveMap({ city, weather, onSelectCity }) {
   const cityLabel = `${city.name}${current?.weather_description ? ` · ${current.weather_description}` : ""}`;
 
   const currentTheme = MAP_THEMES[mapTheme] || MAP_THEMES.clear;
+  const activeFrame = radarFrames[currentFrameIdx];
+
+  const formatFrameTime = (unixTime) => {
+    if (!unixTime) return "LIVE";
+    const d = new Date(unixTime * 1000);
+    const isLatest = currentFrameIdx === radarFrames.length - 1;
+    return `${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}${isLatest ? " (LIVE)" : ""}`;
+  };
 
   return (
     <section className="map-section">
       <div className="map-card">
         <div className="map-header">
           <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
-            <p className="map-title">🗺 Live Map & Country Borders</p>
+            <p className="map-title">🗺 Live Map & HD Doppler Radar</p>
             {isRaining && (
               <span className="rain-live-badge">🌧️ Rain Active</span>
+            )}
+            {radarFrames.length > 0 && (
+              <span
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "0.15rem 0.5rem",
+                  borderRadius: "9999px",
+                  background: "rgba(16, 185, 129, 0.15)",
+                  color: "#6ee7b7",
+                  border: "1px solid rgba(16, 185, 129, 0.3)",
+                  fontWeight: 600,
+                }}
+              >
+                📡 HD Doppler Active
+              </span>
             )}
           </div>
           <div className="layer-pills">
@@ -298,6 +339,12 @@ export default function LiveMap({ city, weather, onSelectCity }) {
               {currentTheme.name}
             </button>
             <button
+              className={`layer-pill${layers.radar ? " active" : ""}`}
+              onClick={() => setLayers((s) => ({ ...s, radar: !s.radar }))}
+            >
+              📡 HD Radar
+            </button>
+            <button
               className={`layer-pill${layers.nepalBorder ? " active" : ""}`}
               onClick={() => setLayers((s) => ({ ...s, nepalBorder: !s.nepalBorder }))}
               title="Toggle country national boundary outline"
@@ -309,12 +356,6 @@ export default function LiveMap({ city, weather, onSelectCity }) {
               onClick={() => setLayers((s) => ({ ...s, temp: !s.temp }))}
             >
               🌡 Temp
-            </button>
-            <button
-              className={`layer-pill${layers.radar ? " active" : ""}`}
-              onClick={() => setLayers((s) => ({ ...s, radar: !s.radar }))}
-            >
-              🌧 Radar
             </button>
             <button
               className={`layer-pill${layers.rainEffect ? " active" : ""}`}
@@ -407,12 +448,16 @@ export default function LiveMap({ city, weather, onSelectCity }) {
                 </Polygon>
               )}
 
-              {layers.radar && radarUrl && (
+              {/* 📡 Ultra High Definition (512px) Doppler Radar Layer */}
+              {layers.radar && radarHost && activeFrame && (
                 <TileLayer
-                  url={radarUrl}
-                  opacity={0.55}
+                  key={`radar-hd-${activeFrame.path}-${radarColorScheme}-${radarOpacity}`}
+                  url={`${radarHost}${activeFrame.path}/512/{z}/{x}/{y}/${radarColorScheme}/1_1.png`}
+                  opacity={radarOpacity}
                   zIndex={400}
-                  attribution="RainViewer"
+                  tileSize={512}
+                  zoomOffset={-1}
+                  attribution='&copy; <a href="https://www.rainviewer.com/">RainViewer HD Doppler</a>'
                   minNativeZoom={0}
                   maxNativeZoom={15}
                   maxZoom={20}
@@ -606,6 +651,66 @@ export default function LiveMap({ city, weather, onSelectCity }) {
                 />
               )}
             </MapContainer>
+
+            {/* 📡 Interactive HD Radar Player Bar */}
+            {layers.radar && radarFrames.length > 0 && (
+              <div className="radar-player-bar">
+                <button
+                  type="button"
+                  className="radar-play-btn"
+                  onClick={() => setIsRadarPlaying((p) => !p)}
+                  title={isRadarPlaying ? "Pause Animation" : "Play Radar Animation"}
+                >
+                  {isRadarPlaying ? "⏸" : "▶"}
+                </button>
+
+                <div className="radar-timeline-wrap">
+                  <span className="radar-time-tag">
+                    🕒 {formatFrameTime(activeFrame?.time)}
+                  </span>
+                  <input
+                    type="range"
+                    className="radar-slider"
+                    min={0}
+                    max={radarFrames.length - 1}
+                    value={currentFrameIdx}
+                    onChange={(e) => {
+                      setIsRadarPlaying(false);
+                      setCurrentFrameIdx(Number(e.target.value));
+                    }}
+                  />
+                </div>
+
+                <div className="radar-controls-right">
+                  <button
+                    type="button"
+                    className={`radar-pill-btn ${radarColorScheme === 4 ? "active" : ""}`}
+                    onClick={() => setRadarColorScheme(4)}
+                    title="Vibrant Multi-color Doppler (Weather Channel style)"
+                  >
+                    🎨 Vibrant
+                  </button>
+                  <button
+                    type="button"
+                    className={`radar-pill-btn ${radarColorScheme === 2 ? "active" : ""}`}
+                    onClick={() => setRadarColorScheme(2)}
+                    title="Universal Rain Blue"
+                  >
+                    💧 Blue
+                  </button>
+                  <button
+                    type="button"
+                    className="radar-pill-btn"
+                    onClick={() =>
+                      setRadarOpacity((o) => (o >= 0.9 ? 0.55 : o >= 0.75 ? 0.95 : 0.78))
+                    }
+                    title="Cycle Radar Opacity"
+                  >
+                    👁️ {Math.round(radarOpacity * 100)}%
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="map-legend">
               <span><i style={{ background: '#38bdf8' }} /> Normal Water Flow</span>
