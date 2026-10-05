@@ -97,7 +97,7 @@ function MapClickHandler({ onMapClick }) {
   return null;
 }
 
-function TempMarker({ position, temp, label }) {
+function TempMarker({ position, temp, city, current, onRefresh }) {
   const icon = useMemo(
     () =>
       L.divIcon({
@@ -111,7 +111,34 @@ function TempMarker({ position, temp, label }) {
 
   return (
     <Marker position={position} icon={icon}>
-      <Popup>{label}</Popup>
+      <Popup autoPan>
+        <div className="city-marker-popup">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.25rem" }}>
+            <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "#0f172a" }}>
+              📍 {city?.name || "Location"}
+            </h4>
+            <span className="cmp-badge">{city?.country || "Nepal"}</span>
+          </div>
+          <div className="city-marker-desc">
+            {weatherIcon(current?.weather_code)} {current?.weather_description || "Live Weather"}
+          </div>
+          <div className="city-marker-temp">{Math.round(temp)}°C</div>
+          {current?.apparent_temperature != null && (
+            <p className="city-marker-feels">Feels like {Math.round(current.apparent_temperature)}°C</p>
+          )}
+          <div className="city-marker-grid">
+            <div>💧 Humidity: <strong>{current?.relative_humidity_2m}%</strong></div>
+            <div>🌧️ Rain: <strong>{current?.precipitation ?? 0} mm</strong></div>
+            <div>💨 Wind: <strong>{current?.wind_speed_10m} km/h</strong></div>
+            <div>🧭 GPS: <strong>{city?.latitude?.toFixed(2)}, {city?.longitude?.toFixed(2)}</strong></div>
+          </div>
+          {onRefresh && (
+            <button type="button" className="city-marker-refresh" onClick={onRefresh}>
+              🔄 Refresh Weather
+            </button>
+          )}
+        </div>
+      </Popup>
     </Marker>
   );
 }
@@ -128,6 +155,26 @@ export default function LiveMap({ city, weather, onSelectCity, onRefresh, isRefr
   const [nepal, setNepal] = useState(null);
   const [error, setError] = useState(null);
   const [focus, setFocus] = useState(null);
+  const [riverWeather, setRiverWeather] = useState(null);
+  const [loadingRiverWeather, setLoadingRiverWeather] = useState(false);
+
+  // Dedicated handler to select any river, focus the map, and fetch live weather at that station
+  const handleRiverSelect = useCallback(async (river) => {
+    setFocus(river);
+    const targetLat = river?.stationLat ?? river?.latitude;
+    const targetLon = river?.stationLon ?? river?.longitude;
+    if (!targetLat || !targetLon) return;
+
+    setLoadingRiverWeather(true);
+    try {
+      const data = await fetchWeather(targetLat, targetLon, river.name);
+      setRiverWeather(data);
+    } catch {
+      setRiverWeather(null);
+    } finally {
+      setLoadingRiverWeather(false);
+    }
+  }, []);
 
   // 📡 HD Radar State
   const [radarHost, setRadarHost] = useState(null);
@@ -195,6 +242,7 @@ export default function LiveMap({ city, weather, onSelectCity, onRefresh, isRefr
   useEffect(() => {
     setLayers((prev) => ({ ...prev, nepalRivers: inNepal }));
     setFocus(null);
+    setRiverWeather(null);
   }, [inNepal, city.name]);
 
   useEffect(() => {
@@ -318,12 +366,15 @@ export default function LiveMap({ city, weather, onSelectCity, onRefresh, isRefr
     return NEPAL_RIVER_PATHS.map((river) => {
       const riskData = riskMap.get(river.id);
       const midIdx = Math.floor(river.coordinates.length / 2);
+      const stationLat = riskData?.latitude ?? river.stationLat ?? river.coordinates[midIdx][0];
+      const stationLon = riskData?.longitude ?? river.stationLon ?? river.coordinates[midIdx][1];
       return {
         ...river,
         ...riskData,
+        name: river.name,
         coordinates: river.coordinates,
-        stationLat: riskData?.latitude ?? river.coordinates[midIdx][0],
-        stationLon: riskData?.longitude ?? river.coordinates[midIdx][1],
+        stationLat,
+        stationLon,
         risk: riskData?.risk ?? "low",
         discharge: riskData?.discharge,
         peak_7d: riskData?.peak_7d,
@@ -625,49 +676,89 @@ export default function LiveMap({ city, weather, onSelectCity, onRefresh, isRefr
                           className: "river-stream-animated",
                         }}
                         eventHandlers={{
-                          click: () => setFocus(river),
+                          click: () => handleRiverSelect(river),
                         }}
                       >
                         <Tooltip sticky>
-                          🌊 <strong>{river.name}</strong> ({river.basin} Basin)
+                          🌊 <strong>{river.name}</strong> ({river.basin} Basin · Click to view details)
                         </Tooltip>
-                        <Popup>
-                          <div>
-                            <h4>🌊 {river.name}</h4>
-                            <p><strong>Basin:</strong> {river.basin} · {river.region}</p>
-                            <p>
-                              <strong>Status:</strong>{" "}
-                              <span style={{ color: RISK_COLORS[river.risk] || "#38bdf8" }}>
-                                {RISK_LABELS[river.risk] ?? "Normal Flow"}
-                              </span>
-                            </p>
-                            {river.discharge != null && (
-                              <p><strong>Discharge:</strong> {river.discharge} m³/s</p>
-                            )}
-                            {river.peak_7d != null && (
-                              <p><strong>7-day Peak:</strong> {river.peak_7d} m³/s</p>
-                            )}
-                          </div>
-                        </Popup>
                       </Polyline>
 
                       {/* 3. River Monitoring Station */}
                       <CircleMarker
                         center={[river.stationLat, river.stationLon]}
-                        radius={isSelected ? 7 : 4.5}
+                        radius={isSelected ? 8 : 5}
                         pathOptions={{
                           color: "#ffffff",
                           fillColor: RISK_COLORS[river.risk] ?? "#0284c7",
                           fillOpacity: 1,
-                          weight: 1.5,
+                          weight: isSelected ? 2.5 : 1.5,
                         }}
                         eventHandlers={{
-                          click: () => setFocus(river),
+                          click: () => handleRiverSelect(river),
                         }}
                       >
-                        <Tooltip direction="top" offset={[0, -4]}>
+                        <Tooltip direction="top" offset={[0, -5]}>
                           📍 {river.name} Station
                         </Tooltip>
+                        <Popup autoPan>
+                          <div className="river-popup-content">
+                            <div className="rpc-header">
+                              <h4>🌊 {river.name}</h4>
+                              <span
+                                className="rpc-risk-tag"
+                                style={{
+                                  color: RISK_COLORS[river.risk] || "#38bdf8",
+                                  borderColor: `${RISK_COLORS[river.risk] || "#38bdf8"}60`,
+                                }}
+                              >
+                                ● {RISK_LABELS[river.risk] ?? "Normal Flow"}
+                              </span>
+                            </div>
+                            <p className="rpc-sub">
+                              <strong>Basin:</strong> {river.basin} Basin · {river.region}
+                            </p>
+
+                            <div className="rpc-hydrology-box">
+                              <div>🌊 Flow: <strong>{river.discharge != null ? `${river.discharge} m³/s` : "Normal Flow"}</strong></div>
+                              <div>📈 7d Peak: <strong>{river.peak_7d != null ? `${river.peak_7d} m³/s` : "N/A"}</strong> {river.ratio != null ? `(${river.ratio}× normal)` : ""}</div>
+                              <div>📍 Gauge Station: <strong>{river.stationLat?.toFixed(2)}°N, {river.stationLon?.toFixed(2)}°E</strong></div>
+                            </div>
+
+                            {/* Live Weather at river station */}
+                            <div className="rpc-weather-box">
+                              {loadingRiverWeather && isSelected ? (
+                                <div className="rpc-weather-loading">⏳ Loading live weather...</div>
+                              ) : isSelected && riverWeather?.current ? (
+                                <div className="rpc-weather-grid">
+                                  <div>🌡️ Temp: <strong>{Math.round(riverWeather.current.temperature_2m)}°C</strong> ({riverWeather.current.weather_description})</div>
+                                  <div>💧 Humidity: <strong>{riverWeather.current.relative_humidity_2m}%</strong> · 🌧️ Rain: <strong>{riverWeather.current.precipitation ?? 0} mm</strong></div>
+                                  <div>💨 Wind: <strong>{riverWeather.current.wind_speed_10m} km/h</strong></div>
+                                </div>
+                              ) : (
+                                <div style={{ fontSize: "0.7rem", color: "#64748b" }}>Click river to fetch live telemetry</div>
+                              )}
+                            </div>
+
+                            {onSelectCity && (
+                              <button
+                                type="button"
+                                className="rpc-forecast-btn"
+                                onClick={() => {
+                                  onSelectCity({
+                                    name: river.name.split(" (")[0],
+                                    country: "Nepal",
+                                    admin1: river.region || river.basin,
+                                    latitude: river.stationLat,
+                                    longitude: river.stationLon,
+                                  });
+                                }}
+                              >
+                                🎯 View Full Forecast for {river.name.split(" (")[0]}
+                              </button>
+                            )}
+                          </div>
+                        </Popup>
                       </CircleMarker>
                     </div>
                   );
@@ -774,10 +865,128 @@ export default function LiveMap({ city, weather, onSelectCity, onRefresh, isRefr
                 <TempMarker
                   position={[lat, lon]}
                   temp={current.temperature_2m}
-                  label={`${cityLabel} ${weatherIcon(current.weather_code)}`}
+                  city={city}
+                  current={current}
+                  onRefresh={handleMapRefresh}
                 />
               )}
             </MapContainer>
+
+            {/* 🌊 Rich Floating Detail Card when any River / Location is selected */}
+            {focus && (
+              <div className="map-floating-river-card">
+                <div className="mfrc-header">
+                  <div className="mfrc-title-wrap">
+                    <span className="mfrc-icon">🌊</span>
+                    <div>
+                      <h4>{focus.name}</h4>
+                      <p>
+                        {focus.basin ? `${focus.basin} Basin · ` : ""}
+                        {focus.region ? `${focus.region} · ` : ""}
+                        📍 {(focus.stationLat ?? focus.latitude)?.toFixed(2)}°N, {(focus.stationLon ?? focus.longitude)?.toFixed(2)}°E
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="mfrc-close-btn"
+                    onClick={() => {
+                      setFocus(null);
+                      setRiverWeather(null);
+                    }}
+                    title="Close details"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="mfrc-body">
+                  <div className="mfrc-badges">
+                    <span
+                      className="mfrc-status-badge"
+                      style={{
+                        color: RISK_COLORS[focus.risk] || "#38bdf8",
+                        borderColor: `${RISK_COLORS[focus.risk] || "#38bdf8"}60`,
+                        background: `${RISK_COLORS[focus.risk] || "#38bdf8"}1a`,
+                      }}
+                    >
+                      ● {RISK_LABELS[focus.risk] ?? "Normal Flow"}
+                    </span>
+                    {focus.discharge != null && (
+                      <span className="mfrc-pill">
+                        🌊 Flow: <strong>{focus.discharge} m³/s</strong>
+                      </span>
+                    )}
+                    {focus.peak_7d != null && (
+                      <span className="mfrc-pill">
+                        📈 7d Peak: <strong>{focus.peak_7d} m³/s</strong> {focus.ratio != null ? `(${focus.ratio}× normal)` : ""}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mfrc-weather-wrap">
+                    {loadingRiverWeather ? (
+                      <div className="mfrc-weather-loading">
+                        <span className="spinning">⏳</span> Fetching live station weather telemetry...
+                      </div>
+                    ) : riverWeather?.current ? (
+                      <div className="mfrc-weather-grid">
+                        <div className="mfrc-stat-card temp-card">
+                          <span className="mfrc-stat-icon">{weatherIcon(riverWeather.current.weather_code)}</span>
+                          <div>
+                            <span className="mfrc-stat-val">{Math.round(riverWeather.current.temperature_2m)}°C</span>
+                            <span className="mfrc-stat-label">{riverWeather.current.weather_description || "Fair"}</span>
+                          </div>
+                        </div>
+                        <div className="mfrc-stat-card">
+                          <span className="mfrc-stat-icon">💧</span>
+                          <div>
+                            <span className="mfrc-stat-val">{riverWeather.current.relative_humidity_2m}%</span>
+                            <span className="mfrc-stat-label">Humidity</span>
+                          </div>
+                        </div>
+                        <div className="mfrc-stat-card">
+                          <span className="mfrc-stat-icon">🌧️</span>
+                          <div>
+                            <span className="mfrc-stat-val">{riverWeather.current.precipitation ?? 0} mm</span>
+                            <span className="mfrc-stat-label">Precipitation</span>
+                          </div>
+                        </div>
+                        <div className="mfrc-stat-card">
+                          <span className="mfrc-stat-icon">💨</span>
+                          <div>
+                            <span className="mfrc-stat-val">{riverWeather.current.wind_speed_10m} km/h</span>
+                            <span className="mfrc-stat-label">Wind</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p style={{ margin: "0.2rem 0", fontSize: "0.72rem", color: "#94a3b8" }}>
+                        Gauge station: {(focus.stationLat ?? focus.latitude)?.toFixed(2)}, {(focus.stationLon ?? focus.longitude)?.toFixed(2)}
+                      </p>
+                    )}
+                  </div>
+
+                  {onSelectCity && (
+                    <button
+                      type="button"
+                      className="mfrc-action-btn"
+                      onClick={() => {
+                        onSelectCity({
+                          name: (focus.name || "").split(" (")[0],
+                          country: "Nepal",
+                          admin1: focus.region || focus.basin,
+                          latitude: focus.stationLat ?? focus.latitude,
+                          longitude: focus.stationLon ?? focus.longitude,
+                        });
+                      }}
+                    >
+                      🎯 View Full 7-Day Forecast for {(focus.name || "").split(" (")[0]}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* 📡 Interactive Radar Player Bar */}
             {layers.radar && radarFrames.length > 0 && (
@@ -851,7 +1060,10 @@ export default function LiveMap({ city, weather, onSelectCity, onRefresh, isRefr
             title={inNepal && layers.nepalRivers ? "Nepal River Flow & Risk" : "Nearby River Risk"}
             items={sidebarItems}
             selectedId={selectedId}
-            onSelect={setFocus}
+            onSelect={handleRiverSelect}
+            onSelectCity={onSelectCity}
+            riverWeather={riverWeather}
+            loadingRiverWeather={loadingRiverWeather}
             disclaimer={nepal?.disclaimer || overlay?.disclaimer}
           />
         </div>

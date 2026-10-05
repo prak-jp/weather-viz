@@ -1469,3 +1469,434 @@ body {
   box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
 }
 
+
+/* 🌊 Rich River Detail Overlay & Map Inspection */
+.map-floating-river-card {
+  position: absolute;
+  bottom: 45px;
+  left: 12px;
+  z-index: 550;
+  max-width: 440px;
+  width: calc(100% - 24px);
+  background: rgba(10, 18, 36, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 14px;
+  padding: 0.9rem;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(56, 189, 248, 0.15);
+  color: var(--text);
+  animation: fadeUp 0.25s ease-out;
+}
+
+.mfrc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 0.5rem;
+}
+
+.mfrc-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.mfrc-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.mfrc-title-wrap h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f0f9ff;
+  line-height: 1.25;
+}
+
+.mfrc-title-wrap p {
+  margin: 0.15rem 0 0;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.mfrc-close-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.mfrc-close-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  border-color: #ef4444;
+}
+
+.mfrc-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.65rem;
+  align-items: center;
+}
+
+.mfrc-status-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  border: 1px solid;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.mfrc-pill {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.55rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+  color: #cbd5e1;
+}
+
+.mfrc-pill strong {
+  color: #38bdf8;
+}
+
+.mfrc-weather-wrap {
+  margin-bottom: 0.65rem;
+}
+
+.mfrc-weather-loading {
+  font-size: 0.75rem;
+  color: #38bdf8;
+  padding: 0.4rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.mfrc-weather-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.mfrc-stat-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.mfrc-stat-card.temp-card {
+  grid-column: span 2;
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.15), rgba(14, 165, 233, 0.08));
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.mfrc-stat-icon {
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+
+.mfrc-stat-val {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1.2;
+}
+
+.mfrc-stat-label {
+  display: block;
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.mfrc-action-btn {
+  width: 100%;
+  padding: 0.45rem 0.8rem;
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  color: #ffffff;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+}
+
+.mfrc-action-btn:hover {
+  background: linear-gradient(135deg, #0369a1, #075985);
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.5);
+  transform: translateY(-1px);
+}
+
+/* 📍 City Marker Rich Popup */
+.city-marker-popup {
+  min-width: 220px;
+  color: #0f172a;
+}
+
+.city-marker-popup h4 {
+  margin: 0 0 0.15rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.cmp-badge {
+  font-size: 0.65rem;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 2px 6px;
+  border-radius: 9999px;
+  font-weight: 600;
+  margin-left: 0.3rem;
+}
+
+.city-marker-desc {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  color: #475569;
+}
+
+.city-marker-temp {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #0284c7;
+  line-height: 1.1;
+  margin-bottom: 0.15rem;
+}
+
+.city-marker-feels {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin: 0 0 0.4rem;
+}
+
+.city-marker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem 0.5rem;
+  font-size: 0.72rem;
+  color: #334155;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 0.4rem;
+  margin-bottom: 0.45rem;
+}
+
+.city-marker-refresh {
+  width: 100%;
+  background: #0284c7;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.city-marker-refresh:hover {
+  background: #0369a1;
+}
+
+/* 🌊 River Map Popup Content */
+.river-popup-content {
+  min-width: 240px;
+  color: #0f172a;
+}
+
+.rpc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-bottom: 0.2rem;
+}
+
+.rpc-header h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.rpc-risk-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  border: 1px solid;
+}
+
+.rpc-sub {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  color: #475569;
+}
+
+.rpc-hydrology-box {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.72rem;
+  margin-bottom: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.rpc-weather-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.72rem;
+  margin-bottom: 0.45rem;
+}
+
+.rpc-weather-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.rpc-forecast-btn {
+  width: 100%;
+  background: #0284c7;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.rpc-forecast-btn:hover {
+  background: #0369a1;
+}
+
+/* 📋 Sidebar Enhanced Styles */
+.risk-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.risk-count-badge {
+  font-size: 0.68rem;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 1px 7px;
+  border-radius: 9999px;
+  font-weight: 600;
+}
+
+.risk-item-wrap {
+  border-radius: 12px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.risk-item-wrap.selected-wrap {
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding-bottom: 0.4rem;
+}
+
+.risk-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.3rem;
+  width: 100%;
+}
+
+.risk-status-tag {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  border: 1px solid;
+  flex-shrink: 0;
+}
+
+.risk-expanded-details {
+  padding: 0.4rem 0.6rem 0.2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 0.2rem;
+  animation: fadeUp 0.2s ease-out;
+}
+
+.risk-weather-loading {
+  font-size: 0.7rem;
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0;
+}
+
+.risk-expanded-weather-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.45rem;
+}
+
+.rew-pill {
+  font-size: 0.68rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 2px 6px;
+  color: #cbd5e1;
+}
+
+.risk-apply-city-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  color: #ffffff;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.risk-apply-city-btn:hover {
+  background: linear-gradient(135deg, #0369a1, #075985);
+}

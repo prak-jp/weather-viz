@@ -1,21 +1,9 @@
-﻿import httpx
+import asyncio
+import httpx
+from app.rivers import NEPAL_RIVERS
 
 OPEN_METEO = "https://api.open-meteo.com/v1/forecast"
 GLOFAS_URL = "https://flood-api.open-meteo.com/v1/flood"
-
-# Nepal major rivers with approximate gauge locations
-NEPAL_RIVERS = [
-    {"id": "koshi",      "name": "Koshi River",     "basin": "Koshi",    "region": "Province 1",   "latitude": 26.91, "longitude": 87.16},
-    {"id": "gandaki",    "name": "Gandaki River",    "basin": "Gandaki",  "region": "Gandaki",      "latitude": 27.69, "longitude": 84.43},
-    {"id": "karnali",    "name": "Karnali River",    "basin": "Karnali",  "region": "Karnali",      "latitude": 28.65, "longitude": 81.62},
-    {"id": "bagmati",    "name": "Bagmati River",    "basin": "Bagmati",  "region": "Bagmati",      "latitude": 27.67, "longitude": 85.32},
-    {"id": "rapti",      "name": "Rapti River",      "basin": "Karnali",  "region": "Lumbini",      "latitude": 27.87, "longitude": 82.59},
-    {"id": "mechi",      "name": "Mechi River",      "basin": "Mechi",    "region": "Province 1",   "latitude": 26.65, "longitude": 88.15},
-    {"id": "bheri",      "name": "Bheri River",      "basin": "Karnali",  "region": "Karnali",      "latitude": 28.47, "longitude": 82.35},
-    {"id": "seti",       "name": "Seti River",       "basin": "Gandaki",  "region": "Gandaki",      "latitude": 28.21, "longitude": 83.97},
-    {"id": "marsyangdi", "name": "Marsyangdi River", "basin": "Gandaki",  "region": "Gandaki",      "latitude": 28.33, "longitude": 84.55},
-    {"id": "trisuli",    "name": "Trisuli River",    "basin": "Bagmati",  "region": "Bagmati",      "latitude": 27.87, "longitude": 85.03},
-]
 
 
 def _classify_risk(ratio: float) -> str:
@@ -121,40 +109,40 @@ async def fetch_map_overlay(latitude: float, longitude: float) -> dict:
 
 async def fetch_nepal_rivers() -> dict:
     """
-    Fetch GloFAS discharge for key Nepal river gauges and classify risk.
+    Fetch GloFAS discharge for key Nepal river gauges in parallel and classify risk.
     """
-    results = []
+    async def fetch_one(client: httpx.AsyncClient, river: dict) -> dict:
+        try:
+            r = await client.get(GLOFAS_URL, params={
+                "latitude": river["latitude"],
+                "longitude": river["longitude"],
+                "daily": "river_discharge,river_discharge_max",
+                "forecast_days": 7,
+            })
+            r.raise_for_status()
+            data = r.json()
+            discharges = data.get("daily", {}).get("river_discharge", [])
+            max_discharges = data.get("daily", {}).get("river_discharge_max", [])
 
-    async with httpx.AsyncClient(timeout=20) as client:
-        for river in NEPAL_RIVERS:
-            try:
-                r = await client.get(GLOFAS_URL, params={
-                    "latitude": river["latitude"],
-                    "longitude": river["longitude"],
-                    "daily": "river_discharge,river_discharge_max",
-                    "forecast_days": 7,
-                })
-                r.raise_for_status()
-                data = r.json()
-                discharges = data.get("daily", {}).get("river_discharge", [])
-                max_discharges = data.get("daily", {}).get("river_discharge_max", [])
+            current_q = discharges[0] if discharges else None
+            peak_7d = max(discharges) if discharges else None
+            typical = max_discharges[0] if max_discharges else None
+            ratio = round(current_q / typical, 2) if (current_q and typical and typical > 0) else None
 
-                current_q = discharges[0] if discharges else None
-                peak_7d = max(discharges) if discharges else None
-                typical = max_discharges[0] if max_discharges else None
-                ratio = round(current_q / typical, 2) if (current_q and typical and typical > 0) else None
+            return {
+                **river,
+                "discharge": round(current_q, 1) if current_q is not None else None,
+                "peak_7d": round(peak_7d, 1) if peak_7d is not None else None,
+                "ratio": ratio,
+                "risk": _classify_risk(ratio) if ratio else "low",
+            }
+        except Exception:
+            return {**river, "discharge": None, "peak_7d": None, "ratio": None, "risk": "low"}
 
-                results.append({
-                    **river,
-                    "discharge": round(current_q, 1) if current_q else None,
-                    "peak_7d": round(peak_7d, 1) if peak_7d else None,
-                    "ratio": ratio,
-                    "risk": _classify_risk(ratio) if ratio else "unknown",
-                })
-            except Exception:
-                results.append({**river, "discharge": None, "peak_7d": None, "ratio": None, "risk": "unknown"})
+    async with httpx.AsyncClient(timeout=15) as client:
+        results = await asyncio.gather(*[fetch_one(client, river) for river in NEPAL_RIVERS])
 
     return {
-        "rivers": results,
+        "rivers": list(results),
         "disclaimer": "GloFAS discharge data via Open-Meteo Flood API. Reference only — not for emergency decisions.",
     }
